@@ -12,7 +12,8 @@ CLI uses.
 ## Install
 
 ```sh
-make link        # build, then link this working copy into the running Herdr
+herdr plugin install cgardner/herdr-dstask   # from GitHub; needs Go
+make link        # or build and link a local working copy
 ```
 
 To open the list with a key, add a binding to `~/.config/herdr/config.toml`:
@@ -95,3 +96,7 @@ change to the store. Some possible next steps:
 - Filter by workspace: use the Herdr workspace or repository name as a
   project filter when the popup opens.
 - Resolve a task when its agent reaches `done`.
+
+## License
+
+GPL-2.0. See `LICENSE`.
