@@ -304,3 +304,35 @@ func TestFitLeavesAnUnsizedLineAlone(t *testing.T) {
 		t.Errorf("a zero width means no limit")
 	}
 }
+
+func TestPriorityMarksAreTwoColumnsWide(t *testing.T) {
+	for _, p := range []string{"P0", "P1", "P2", "P3", "P9"} {
+		if w := lipgloss.Width(priorityMark(p)); w != 2 {
+			t.Errorf("%s mark %q is %d columns wide, want 2", p, priorityMark(p), w)
+		}
+	}
+	if priorityMark("P0") != "🔴" || priorityMark("P3") != "🔵" {
+		t.Errorf("wrong circle for a priority")
+	}
+}
+
+// Every row must put the summary in the same column, whatever the priority,
+// or the list stops reading as columns.
+func TestRowsStayAlignedAcrossPriorities(t *testing.T) {
+	m := start(t, &fake{})
+	col := -1
+	for _, p := range []string{"P0", "P1", "P2", "P3"} {
+		line := stripSGR(m.row(dstask.Task{ID: 1, Priority: p, Status: "pending", Summary: "SUMMARY"}, false))
+		at := lipgloss.Width(line[:strings.Index(line, "SUMMARY")])
+		if col == -1 {
+			col = at
+		}
+		if at != col {
+			t.Errorf("%s: summary at column %d, want %d", p, at, col)
+		}
+	}
+	header := stripSGR(strings.Split(m.View(), "\n")[1])
+	if at := lipgloss.Width(header[:strings.Index(header, "SUMMARY")]); at != col {
+		t.Errorf("header SUMMARY at column %d, rows at %d", at, col)
+	}
+}

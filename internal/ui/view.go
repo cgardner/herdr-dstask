@@ -47,7 +47,7 @@ func (m Model) viewList() string {
 	var b strings.Builder
 	b.WriteString(m.header())
 	b.WriteByte('\n')
-	b.WriteString(styleDim.Render(fit(fmt.Sprintf("  %4s %-3s %-1s %-16s %s", "ID", "PRI", "", "PROJECT", "SUMMARY"), m.width)))
+	b.WriteString(styleDim.Render(fit(fmt.Sprintf("  %4s %-2s %-1s %-16s %s", "ID", "", "", "PROJECT", "SUMMARY"), m.width)))
 	b.WriteByte('\n')
 
 	rows := m.listRows()
@@ -132,7 +132,7 @@ func (m Model) row(t dstask.Task, selected bool) string {
 	glyph, glyphStyle := statusMark(t.Status)
 	line := gutter.Render(bar) + sp +
 		seg(styleDim, id) + sp +
-		seg(priorityStyle(t.Priority), fmt.Sprintf("%-3s", t.Priority)) + sp +
+		seg(lipgloss.NewStyle(), priorityMark(t.Priority)) + sp +
 		seg(glyphStyle, glyph) + sp +
 		seg(styleProject, fmt.Sprintf("%-16s", ansi.Truncate(t.Project, 16, "…"))) + sp +
 		seg(summaryStyle(t), t.Summary)
@@ -178,6 +178,26 @@ func (m Model) dueLabel(t dstask.Task) string {
 		return ""
 	}
 	return st.Render(label)
+}
+
+// priorityMarks are colored circles in traffic-light order, so the rank reads
+// from color alone. Each is one code point that terminals draw two columns
+// wide. An emoji that needs a variation selector, such as ⬆️, is drawn at
+// different widths by different terminals and would break the columns.
+var priorityMarks = map[string]string{
+	dstask.PRIORITY_CRITICAL: "🔴",
+	dstask.PRIORITY_HIGH:     "🟠",
+	dstask.PRIORITY_NORMAL:   "🟡",
+	dstask.PRIORITY_LOW:      "🔵",
+}
+
+// priorityMark is the circle for a priority. dstask validates priorities, so
+// an unknown one falls back to blank space of the same width.
+func priorityMark(p string) string {
+	if mark, ok := priorityMarks[p]; ok {
+		return mark
+	}
+	return "  "
 }
 
 func priorityStyle(p string) lipgloss.Style {
@@ -294,7 +314,7 @@ func (m Model) detailBody(t dstask.Task) string {
 	}
 	var b strings.Builder
 	b.WriteString(field("status", strings.TrimSpace(statusGlyph(t.Status)+" "+t.Status)))
-	b.WriteString(field("priority", priorityStyle(t.Priority).Render(t.Priority)))
+	b.WriteString(field("priority", priorityMark(t.Priority)+" "+priorityStyle(t.Priority).Render(t.Priority)))
 	if t.Project != "" {
 		b.WriteString(field("project", styleProject.Render(t.Project)))
 	}

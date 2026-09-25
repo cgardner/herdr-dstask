@@ -62,3 +62,11 @@ test replaces: `cli.openStore` and `cli.runProgram`. The editor callback is
 `ui.editorDone`, a named function, because a test cannot reach a closure
 inside `tea.ExecProcess`. Keep a new outside call behind the same pattern.
 Only `main` and a few error returns for disk failures are not covered.
+
+## Emoji in the list
+
+The priority column is a colored circle, 🔴 🟠 🟡 🔵 for P0 to P3. Each is one
+code point that terminals draw two columns wide, and Herdr agrees. Do not use
+an emoji that needs a variation selector, such as ⬆️ or ⚠️. Terminals do not
+agree on its width, and the columns after it move. `TestRowsStayAlignedAcross
+Priorities` catches a mark of the wrong width.
