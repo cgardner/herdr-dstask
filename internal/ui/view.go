@@ -376,6 +376,7 @@ func (m Model) viewHelp() string {
 		{"enter l", "view the task"},
 		{"esc h", "back; in the list, clear a filter or quit"},
 		{"/", "filter by words in summary, project, tags, notes"},
+		{"#", "find by id: #72, or #72 #29 for several"},
 		{"A", "show only active tasks, or all tasks again"},
 		{"tab", "switch between open and resolved tasks"},
 		{"c", "switch between the dstask context and every task"},

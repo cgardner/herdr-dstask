@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
+	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -243,16 +245,40 @@ func (m *Model) applyFilter() {
 
 // matches reports whether every word of the filter occurs in the summary,
 // project, tags, notes, priority or status, ignoring case.
+//
+// A word such as "#72" matches the task ID exactly. Several ID words match any
+// of those tasks, and the text words then narrow the result. A bare number
+// stays a text search, so a ticket number such as "3995" in a summary can
+// still be found. A lone "#" matches everything, so the list does not empty
+// while the user starts to type an ID.
 func matches(t dstask.Task, filter string) bool {
 	hay := strings.ToLower(strings.Join([]string{
 		t.Summary, t.Project, strings.Join(t.Tags, " "), t.Notes, t.Priority, t.Status,
 	}, "\n"))
+	var ids []int
 	for _, word := range strings.Fields(strings.ToLower(filter)) {
+		if word == "#" {
+			continue
+		}
+		if id, ok := idWord(word); ok {
+			ids = append(ids, id)
+			continue
+		}
 		if !strings.Contains(hay, strings.TrimPrefix(word, "+")) {
 			return false
 		}
 	}
-	return true
+	return len(ids) == 0 || slices.Contains(ids, t.ID)
+}
+
+// idWord reads "#72" as the ID 72.
+func idWord(word string) (int, bool) {
+	rest, ok := strings.CutPrefix(word, "#")
+	if !ok || rest == "" {
+		return 0, false
+	}
+	id, err := strconv.Atoi(rest)
+	return id, err == nil && id > 0
 }
 
 func (m *Model) clamp() {
@@ -338,6 +364,9 @@ func (m Model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "/":
 		return m.openPrompt(promptFilter, m.filter)
+	case "#":
+		// A shortcut to the ID search: the filter opens with "#" typed.
+		return m.openPrompt(promptFilter, "#")
 	case "tab":
 		m.showResolved = !m.showResolved
 		m.filter = ""
@@ -476,7 +505,7 @@ func (m Model) openPrompt(kind promptKind, value string) (tea.Model, tea.Cmd) {
 }
 
 var placeholders = map[promptKind]string{
-	promptFilter: "words to match in summary, project, tags or notes",
+	promptFilter: "words to match, or #72 for a task id",
 	promptModify: "+tag -tag project:name P1 due:friday",
 	promptNote:   "text to append to the notes",
 	promptAdd:    "+tag project:name P1 summary of the task",

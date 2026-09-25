@@ -48,7 +48,8 @@ description = "dstask tasks (sandbox copy)"
 |---|---|
 | `j` `k` `g` `G` `ctrl+d` `ctrl+u` | move |
 | `enter` | view the task: all fields and the notes |
-| `/` | filter by words in the summary, project, tags or notes |
+| `/` | filter by words in the summary, project, tags or notes. `#72` in the filter matches task 72, and `#72 #29` matches either. A bare number is a text search |
+| `#` | find by ID: opens the filter with `#` typed |
 | `A` | show only active tasks; press again to show all. It works with `/` |
 | `tab` | switch between open and resolved tasks |
 | `c` | switch between the dstask context and all tasks |

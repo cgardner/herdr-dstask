@@ -375,3 +375,50 @@ func TestActiveFilterIsRefusedForResolvedTasks(t *testing.T) {
 		t.Errorf("A in the resolved list should be refused")
 	}
 }
+
+func TestFilterByID(t *testing.T) {
+	open := append(tasks(), dstask.Task{UUID: "t", ID: 72, Summary: "fix SAL-3 and 9 others", Status: "pending", Priority: "P2"})
+	cases := []struct {
+		filter string
+		want   []int
+	}{
+		{"#7", []int{7}},
+		{"#72", []int{72}},
+		{"#3 #9", []int{3, 9}},     // several IDs match any of them
+		{"#3 #9 garage", []int{9}}, // text words narrow the IDs
+		{"#999", nil},              // no such task
+		{"9", []int{72}},           // a bare number is a text search
+		{"#", []int{3, 7, 9, 72}},  // a lone # hides nothing
+		{"#abc", nil},              // not an id, so a text word that matches nothing
+		{"#0", nil},                // resolved tasks have no id to find
+	}
+	for _, c := range cases {
+		var got []int
+		for _, task := range open {
+			if matches(task, c.filter) {
+				got = append(got, task.ID)
+			}
+		}
+		if fmt.Sprint(got) != fmt.Sprint(c.want) {
+			t.Errorf("%q: got %v, want %v", c.filter, got, c.want)
+		}
+	}
+}
+
+func TestHashKeyOpensTheIDSearch(t *testing.T) {
+	m := start(t, &fake{open: tasks()})
+	m = drive(t, m, key("#"))
+	if m.mode != modePrompt || m.prompt != promptFilter || m.input.Value() != "#" {
+		t.Fatalf("mode=%v value=%q", m.mode, m.input.Value())
+	}
+	if len(m.visible) != 3 {
+		t.Errorf("a lone # should not hide tasks while typing")
+	}
+	m = drive(t, m, append(typed("9"), key("enter"))...)
+	if len(m.visible) != 1 || m.visible[0].ID != 9 || m.filter != "#9" {
+		t.Errorf("visible=%+v filter=%q", m.visible, m.filter)
+	}
+	if got, _ := m.selected(); got.ID != 9 {
+		t.Errorf("the found task should be selected, got #%d", got.ID)
+	}
+}
