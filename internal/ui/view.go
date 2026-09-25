@@ -48,7 +48,7 @@ func (m Model) viewList() string {
 	var b strings.Builder
 	b.WriteString(m.header())
 	b.WriteByte('\n')
-	b.WriteString(styleDim.Render(fit(fmt.Sprintf("  %4s %-1s %-1s %-16s %s", "ID", "", "", "PROJECT", "SUMMARY"), m.width)))
+	b.WriteString(styleDim.Render(fit(fmt.Sprintf("  %*s %-1s %-1s %-16s %s", m.idWidth(), "ID", "", "", "PROJECT", "SUMMARY"), m.width)))
 	b.WriteByte('\n')
 
 	rows := m.listRows()
@@ -126,9 +126,9 @@ func (m Model) row(t dstask.Task, selected bool) string {
 	if selected {
 		bar = "▌"
 	}
-	id := fmt.Sprintf("%4d", t.ID)
+	id := fmt.Sprintf("%*d", m.idWidth(), t.ID)
 	if t.ID == 0 {
-		id = "   –"
+		id = fmt.Sprintf("%*s", m.idWidth(), "–")
 	}
 	glyph, glyphStyle := statusMark(t.Status)
 	line := gutter.Render(bar) + sp +
@@ -144,6 +144,19 @@ func (m Model) row(t dstask.Task, selected bool) string {
 		line += sp + seg(styleTag, "+"+tag)
 	}
 	return fill(line, m.width, base)
+}
+
+// idWidth is one column more than the longest ID in the loaded list, and never
+// less than the "ID" heading. It follows every loaded task, not only the
+// visible ones, so the columns do not move while a filter narrows the list.
+func (m Model) idWidth() int {
+	longest := 1
+	for _, t := range m.all {
+		if n := len(fmt.Sprint(t.ID)); n > longest {
+			longest = n
+		}
+	}
+	return max(len("ID"), longest+1)
 }
 
 // fill truncates a composed line to the width and pads it out with the row

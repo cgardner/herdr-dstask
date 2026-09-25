@@ -357,3 +357,48 @@ func TestRowsStayAlignedAcrossPriorities(t *testing.T) {
 		t.Errorf("header SUMMARY at column %d, rows at %d", at, col)
 	}
 }
+
+func TestIDColumnIsOneWiderThanTheLongestID(t *testing.T) {
+	for _, c := range []struct {
+		ids  []int
+		want int
+	}{
+		{nil, 2},            // the heading "ID" sets the minimum
+		{[]int{3, 7, 9}, 2}, // one digit plus one space
+		{[]int{7, 42}, 3},
+		{[]int{7, 178}, 4},
+		{[]int{0}, 2}, // a resolved task shows "–"
+	} {
+		var open []dstask.Task
+		for _, id := range c.ids {
+			open = append(open, dstask.Task{UUID: fmt.Sprint(id), ID: id, Summary: "SUMMARY", Status: "pending", Priority: "P2"})
+		}
+		m := start(t, &fake{open: open})
+		if got := m.idWidth(); got != c.want {
+			t.Errorf("ids %v: width %d, want %d", c.ids, got, c.want)
+		}
+		if len(open) == 0 {
+			continue
+		}
+		// The header and every row must still agree on the summary column.
+		header := stripSGR(strings.Split(m.View(), "\n")[1])
+		row := stripSGR(m.row(open[len(open)-1], false))
+		hAt := lipgloss.Width(header[:strings.Index(header, "SUMMARY")])
+		rAt := lipgloss.Width(row[:strings.Index(row, "SUMMARY")])
+		if hAt != rAt {
+			t.Errorf("ids %v: header SUMMARY at %d, row at %d", c.ids, hAt, rAt)
+		}
+	}
+}
+
+func TestIDColumnIgnoresTheFilter(t *testing.T) {
+	open := []dstask.Task{
+		{UUID: "a", ID: 5, Summary: "short", Status: "pending", Priority: "P2"},
+		{UUID: "b", ID: 123, Summary: "long", Status: "pending", Priority: "P2"},
+	}
+	m := start(t, &fake{open: open})
+	m = drive(t, m, append([]tea.Msg{key("/")}, typed("short")...)...)
+	if len(m.visible) != 1 || m.idWidth() != 4 {
+		t.Errorf("visible=%d width=%d; a filter must not change the width", len(m.visible), m.idWidth())
+	}
+}
