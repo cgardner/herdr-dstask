@@ -99,43 +99,80 @@ func (m Model) header() string {
 	return fit(" "+strings.Join(parts, styleDim.Render(" · ")), m.width)
 }
 
+// row draws one task. The selected row carries a background across the full
+// width and a bar in the gutter, the way herdr-switcher-plus and Herdr's own
+// overlays mark a selection.
+//
+// Every segment is rendered with the row base inherited. A foreground style
+// emits its own reset at the end of each segment, so a background applied to
+// the finished line would stop at the first colored segment.
 func (m Model) row(t dstask.Task, selected bool) string {
-	marker := "  "
+	base := lipgloss.NewStyle()
+	gutter := lipgloss.NewStyle()
 	if selected {
-		marker = styleKey.Render("▌ ")
+		base = base.Background(m.selectionBg)
+		gutter = base.Foreground(lipgloss.Color(accentColor))
+	}
+	seg := func(st lipgloss.Style, text string) string { return st.Inherit(base).Render(text) }
+	sp := base.Render(" ")
+
+	bar := " "
+	if selected {
+		bar = "▌"
 	}
 	id := fmt.Sprintf("%4d", t.ID)
 	if t.ID == 0 {
 		id = "   –"
 	}
-	line := fmt.Sprintf("%s%s %s %s %s %s",
-		marker,
-		styleDim.Render(id),
-		priorityStyle(t.Priority).Render(fmt.Sprintf("%-3s", t.Priority)),
-		statusGlyph(t.Status),
-		styleProject.Render(fmt.Sprintf("%-16s", ansi.Truncate(t.Project, 16, "…"))),
-		summaryStyle(t).Render(t.Summary),
-	)
-	if due := m.dueLabel(t); due != "" {
-		line += " " + due
+	glyph, glyphStyle := statusMark(t.Status)
+	line := gutter.Render(bar) + sp +
+		seg(styleDim, id) + sp +
+		seg(priorityStyle(t.Priority), fmt.Sprintf("%-3s", t.Priority)) + sp +
+		seg(glyphStyle, glyph) + sp +
+		seg(styleProject, fmt.Sprintf("%-16s", ansi.Truncate(t.Project, 16, "…"))) + sp +
+		seg(summaryStyle(t), t.Summary)
+	if due, st := m.due(t); due != "" {
+		line += sp + seg(st, due)
 	}
 	for _, tag := range t.Tags {
-		line += " " + styleTag.Render("+"+tag)
+		line += sp + seg(styleTag, "+"+tag)
 	}
-	// The marker alone shows the selection. A background under the row would
-	// be cut short by the reset that each colored segment emits.
-	return fit(line, m.width)
+	return fill(line, m.width, base)
 }
 
-func (m Model) dueLabel(t dstask.Task) string {
+// fill truncates a composed line to the width and pads it out with the row
+// base, so a selection background reaches the right edge.
+func fill(line string, width int, base lipgloss.Style) string {
+	if width <= 0 {
+		return line
+	}
+	if ansi.StringWidth(line) > width {
+		line = ansi.Truncate(line, width, base.Render("…"))
+	}
+	if w := ansi.StringWidth(line); w < width {
+		line += base.Render(strings.Repeat(" ", width-w))
+	}
+	return line
+}
+
+// due is the due-date label and its style: red once an open task is late.
+func (m Model) due(t dstask.Task) (string, lipgloss.Style) {
 	if t.Due.IsZero() {
-		return ""
+		return "", styleDim
 	}
 	label := "due " + t.Due.Format("Mon 02 Jan")
 	if t.Status != dstask.STATUS_RESOLVED && t.Due.Before(m.now()) {
-		return styleOverdue.Render(label)
+		return label, styleOverdue
 	}
-	return styleDim.Render(label)
+	return label, styleDim
+}
+
+func (m Model) dueLabel(t dstask.Task) string {
+	label, st := m.due(t)
+	if label == "" {
+		return ""
+	}
+	return st.Render(label)
 }
 
 func priorityStyle(p string) lipgloss.Style {
@@ -163,20 +200,26 @@ func summaryStyle(t dstask.Task) lipgloss.Style {
 	return lipgloss.NewStyle()
 }
 
-func statusGlyph(status string) string {
+// statusMark is the one-column status mark and its style. Pending has none.
+func statusMark(status string) (string, lipgloss.Style) {
 	switch status {
 	case dstask.STATUS_ACTIVE:
-		return styleActive.Render("▶")
+		return "▶", styleActive
 	case dstask.STATUS_PAUSED:
-		return stylePaused.Render("‖")
+		return "‖", stylePaused
 	case dstask.STATUS_RESOLVED:
-		return styleDim.Render("✓")
+		return "✓", styleDim
 	case dstask.STATUS_DELEGATED:
-		return styleDim.Render("→")
+		return "→", styleDim
 	case dstask.STATUS_DEFERRED:
-		return styleDim.Render("z")
+		return "z", styleDim
 	}
-	return " "
+	return " ", lipgloss.NewStyle()
+}
+
+func statusGlyph(status string) string {
+	glyph, st := statusMark(status)
+	return st.Render(glyph)
 }
 
 func (m Model) footer() string {

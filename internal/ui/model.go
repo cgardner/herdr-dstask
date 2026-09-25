@@ -12,6 +12,7 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 
 	"github.com/naggie/dstask"
 )
@@ -89,6 +90,8 @@ type Model struct {
 	// a reload underneath cannot redirect the change to another task.
 	target dstask.Task
 
+	selectionBg lipgloss.Color
+
 	status    string
 	statusErr bool
 	loading   bool
@@ -101,7 +104,10 @@ func New(b Backend) Model {
 	in := textinput.New()
 	in.Prompt = "› "
 	in.CharLimit = 2000
-	return Model{backend: b, input: in, now: time.Now, loading: true, width: 80, height: 24}
+	return Model{
+		backend: b, input: in, now: time.Now, loading: true, width: 80, height: 24,
+		selectionBg: selectionBackground(),
+	}
 }
 
 // Messages.
