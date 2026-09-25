@@ -49,6 +49,7 @@ description = "dstask tasks (sandbox copy)"
 | `j` `k` `g` `G` `ctrl+d` `ctrl+u` | move |
 | `enter` | view the task: all fields and the notes |
 | `/` | filter by words in the summary, project, tags or notes |
+| `A` | show only active tasks; press again to show all. It works with `/` |
 | `tab` | switch between open and resolved tasks |
 | `c` | switch between the dstask context and all tasks |
 | `a` | add a task, in dstask syntax: `+tag project:x P1 summary` |
@@ -61,7 +62,8 @@ description = "dstask tasks (sandbox copy)"
 | `x` | remove, after a confirmation |
 | `u` | undo the last change (`git revert`, the same as `dstask undo`) |
 | `?` | help |
-| `q` `esc` | quit |
+| `esc` | clear the text filter, then the active filter, then quit |
+| `q` | quit |
 
 ## Environment
 

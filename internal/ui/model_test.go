@@ -289,3 +289,69 @@ func stripSGR(s string) string {
 	}
 	return b.String()
 }
+
+func TestActiveFilterShowsOnlyStartedTasks(t *testing.T) {
+	m := start(t, &fake{open: tasks()})
+	m = drive(t, m, key("A"))
+	if len(m.visible) != 1 || m.visible[0].ID != 7 {
+		t.Fatalf("visible = %+v, want only #7", m.visible)
+	}
+	if !strings.Contains(m.View(), "active only") {
+		t.Errorf("header should name the active filter")
+	}
+	m = drive(t, m, key("A"))
+	if m.activeOnly || len(m.visible) != 3 {
+		t.Errorf("a second A should show every task")
+	}
+}
+
+func TestActiveFilterCombinesWithTextFilter(t *testing.T) {
+	m := start(t, &fake{open: tasks()})
+	m = drive(t, m, key("A"), key("/"))
+	m = drive(t, m, append(typed("garage"), key("enter"))...)
+	if len(m.visible) != 0 || !strings.Contains(m.View(), "no task matches") {
+		t.Fatalf("paused #9 must stay hidden: %+v", m.visible)
+	}
+	// esc clears the text filter first and keeps the active filter.
+	m = drive(t, m, key("esc"))
+	if m.filter != "" || !m.activeOnly || len(m.visible) != 1 {
+		t.Fatalf("filter=%q activeOnly=%v visible=%d", m.filter, m.activeOnly, len(m.visible))
+	}
+	m = drive(t, m, key("esc"))
+	if m.activeOnly || len(m.visible) != 3 {
+		t.Errorf("the second esc should clear the active filter")
+	}
+}
+
+func TestActiveFilterSurvivesReload(t *testing.T) {
+	f := &fake{open: tasks()}
+	m := start(t, f)
+	m = drive(t, m, key("A"))
+	f.open = append(tasks(), dstask.Task{UUID: "d", ID: 11, Summary: "new work", Status: "active"})
+	m = drive(t, m, key("r"))
+	if len(m.visible) != 2 {
+		t.Errorf("after reload, visible = %d, want the 2 active tasks", len(m.visible))
+	}
+}
+
+func TestActiveFilterEmptyMessage(t *testing.T) {
+	open := tasks()
+	open[1].Status = "pending"
+	m := start(t, &fake{open: open})
+	m = drive(t, m, key("A"))
+	if !strings.Contains(m.View(), "no active tasks") {
+		t.Errorf("empty active list should say so")
+	}
+}
+
+func TestActiveFilterIsRefusedForResolvedTasks(t *testing.T) {
+	m := start(t, &fake{open: tasks()})
+	m = drive(t, m, key("A"), key("tab"))
+	if m.activeOnly {
+		t.Fatal("tab should clear the active filter")
+	}
+	m = drive(t, m, key("A"))
+	if m.activeOnly || !m.statusErr {
+		t.Errorf("A in the resolved list should be refused")
+	}
+}

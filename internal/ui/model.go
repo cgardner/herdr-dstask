@@ -75,6 +75,10 @@ type Model struct {
 	visible []dstask.Task
 	filter  string
 
+	// activeOnly narrows the open list to started tasks. It works with the
+	// text filter, not in place of it.
+	activeOnly bool
+
 	cursor int
 	offset int
 	width  int
@@ -227,6 +231,9 @@ func (m *Model) setTasks(tasks []dstask.Task) {
 func (m *Model) applyFilter() {
 	m.visible = m.visible[:0:0]
 	for _, t := range m.all {
+		if m.activeOnly && t.Status != dstask.STATUS_ACTIVE {
+			continue
+		}
 		if m.filter == "" || matches(t, m.filter) {
 			m.visible = append(m.visible, t)
 		}
@@ -286,12 +293,29 @@ func (m Model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "q", "ctrl+c":
 		return m, tea.Quit
 	case "esc":
+		// esc clears one filter at a time before it quits.
 		if m.filter != "" {
 			m.filter = ""
 			m.applyFilter()
 			return m, nil
 		}
+		if m.activeOnly {
+			m.activeOnly = false
+			m.applyFilter()
+			return m, nil
+		}
 		return m, tea.Quit
+	case "A":
+		// Resolved tasks are never active, so the filter applies only to the
+		// open list.
+		if m.showResolved {
+			m.setErr(errors.New("resolved tasks are never active; tab returns to the open list"))
+			return m, nil
+		}
+		m.activeOnly = !m.activeOnly
+		m.cursor, m.offset = 0, 0
+		m.applyFilter()
+		return m, nil
 	case "j", "down":
 		m.cursor++
 	case "k", "up":
@@ -317,6 +341,7 @@ func (m Model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "tab":
 		m.showResolved = !m.showResolved
 		m.filter = ""
+		m.activeOnly = false
 		m.cursor, m.offset = 0, 0
 		m.loading = true
 		return m, m.load()

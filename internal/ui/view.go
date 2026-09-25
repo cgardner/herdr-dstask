@@ -58,6 +58,8 @@ func (m Model) viewList() string {
 			msg = "loading…"
 		case m.filter != "":
 			msg = "no task matches " + fmt.Sprintf("%q", m.filter)
+		case m.activeOnly:
+			msg = "no active tasks (s starts one, A shows all)"
 		}
 		b.WriteString(styleDim.Render("  " + msg))
 		b.WriteByte('\n')
@@ -89,6 +91,9 @@ func (m Model) header() string {
 		parts = append(parts, styleDim.Render("context ignored"))
 	case m.context != "":
 		parts = append(parts, "context "+styleProject.Render(m.context))
+	}
+	if m.activeOnly {
+		parts = append(parts, styleActive.Render("▶ active only"))
 	}
 	if m.filter != "" {
 		parts = append(parts, "filter "+styleTag.Render(m.filter))
@@ -241,7 +246,7 @@ func (m Model) footer() string {
 	if m.mode == modeDetail {
 		return hints(m.width, "esc", "back", "s", "start/stop", "d", "done", "m", "modify", "n", "note", "N", "edit notes", "e", "edit", "x", "remove", "?", "help")
 	}
-	return hints(m.width, "enter", "view", "/", "filter", "a", "add", "s", "start/stop", "d", "done", "m", "modify", "n", "note", "e", "edit", "tab", "resolved", "?", "help")
+	return hints(m.width, "enter", "view", "/", "filter", "A", "active", "a", "add", "s", "start/stop", "d", "done", "m", "modify", "n", "note", "e", "edit", "tab", "resolved", "?", "help")
 }
 
 func (m Model) promptLine() string {
@@ -337,8 +342,9 @@ func (m Model) viewHelp() string {
 		{"g G", "first, last"},
 		{"ctrl+d ctrl+u", "half a page down, up"},
 		{"enter l", "view the task"},
-		{"esc h", "back; in the list, clear the filter or quit"},
+		{"esc h", "back; in the list, clear a filter or quit"},
 		{"/", "filter by words in summary, project, tags, notes"},
+		{"A", "show only active tasks, or all tasks again"},
 		{"tab", "switch between open and resolved tasks"},
 		{"c", "switch between the dstask context and every task"},
 		{"r", "reload"},
