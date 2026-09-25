@@ -25,6 +25,20 @@ command = "cgardner.herdr-dstask.open"
 description = "dstask tasks"
 ```
 
+To test on a copy of your tasks, open the `dstask: tasks (sandbox copy)`
+action, or run `make sandbox`. It copies `~/.dstask` to
+`$TMPDIR/herdr-dstask-sandbox` one time and removes the git remotes from the
+copy. Thus changes and `dstask sync` in the sandbox cannot reach your real
+tasks. `make sandbox FRESH=1` copies the repository again.
+
+```toml
+[[keys.command]]
+key = "prefix+alt+t"
+type = "plugin_action"
+command = "cgardner.herdr-dstask.open-sandbox"
+description = "dstask tasks (sandbox copy)"
+```
+
 `make run` starts the UI in the current terminal, outside Herdr.
 `make list` prints the open tasks and does not start the UI.
 

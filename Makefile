@@ -43,6 +43,10 @@ run: build ## Open the UI in this terminal, outside Herdr
 list: build ## Print the open tasks without the UI
 	@./bin/$(BINARY) --list
 
+.PHONY: sandbox
+sandbox: build ## Open the popup on a copy of ~/.dstask (FRESH=1 copies again)
+	@bash scripts/sandbox.sh $(if $(FRESH),--fresh)
+
 .PHONY: clean
 clean: ## Remove build output
 	@rm -rf bin

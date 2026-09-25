@@ -32,3 +32,11 @@ command = [
   "-c",
   "exec \"${HERDR_BIN_PATH:-herdr}\" plugin pane open --plugin cgardner.herdr-dstask --entrypoint tasks --focus",
 ]
+
+# The same list on a copy of ~/.dstask, so a test can change tasks freely.
+[[actions]]
+id = "open-sandbox"
+title = "dstask: tasks (sandbox copy)"
+contexts = ["global", "workspace", "pane"]
+description = "Open the task list on a copy of the dstask repository."
+command = ["bash", "-c", "exec bash \"$HERDR_PLUGIN_ROOT/scripts/sandbox.sh\""]
