@@ -63,10 +63,19 @@ test replaces: `cli.openStore` and `cli.runProgram`. The editor callback is
 inside `tea.ExecProcess`. Keep a new outside call behind the same pattern.
 Only `main` and a few error returns for disk failures are not covered.
 
-## Emoji in the list
+## Colors follow the terminal theme
 
-The priority column is a colored circle, 🔴 🟠 🟡 🔵 for P0 to P3. Each is one
-code point that terminals draw two columns wide, and Herdr agrees. Do not use
-an emoji that needs a variation selector, such as ⬆️ or ⚠️. Terminals do not
-agree on its width, and the columns after it move. `TestRowsStayAlignedAcross
-Priorities` catches a mark of the wrong width.
+Every foreground color is an ANSI palette index from 0 to 15, so the terminal
+theme decides the real color. Herdr gives a plugin no way to read its own
+theme: the API schema and the snapshot carry no color data. The terminal
+palette is thus the only theme the pane can follow. If the terminal and Herdr
+use the same theme, the colors match. `TestColorsArePaletteIndexes` fails on a
+fixed 256-color or hex value.
+
+The selection background is the exception. It must match Herdr's own
+overlays, so it comes from `selection_bg` in the Herdr config, as in
+herdr-switcher-plus.
+
+The priority column is a one-column dot: `●` for P0 and P1, `○` for P2, `·`
+for P3, colored by priority. Do not use emoji. They carry their own colors,
+which ignore the theme.

@@ -305,14 +305,35 @@ func TestFitLeavesAnUnsizedLineAlone(t *testing.T) {
 	}
 }
 
-func TestPriorityMarksAreTwoColumnsWide(t *testing.T) {
+func TestPriorityMarksAreOneColumnWide(t *testing.T) {
 	for _, p := range []string{"P0", "P1", "P2", "P3", "P9"} {
-		if w := lipgloss.Width(priorityMark(p)); w != 2 {
-			t.Errorf("%s mark %q is %d columns wide, want 2", p, priorityMark(p), w)
+		if w := lipgloss.Width(priorityMark(p)); w != 1 {
+			t.Errorf("%s mark %q is %d columns wide, want 1", p, priorityMark(p), w)
 		}
 	}
-	if priorityMark("P0") != "🔴" || priorityMark("P3") != "🔵" {
-		t.Errorf("wrong circle for a priority")
+	if priorityMark("P0") != "●" || priorityMark("P2") != "○" || priorityMark("P3") != "·" {
+		t.Errorf("wrong mark for a priority")
+	}
+}
+
+// The pane follows the terminal theme only while every color is a palette
+// index. A fixed 256-color or hex value would ignore the theme.
+func TestColorsArePaletteIndexes(t *testing.T) {
+	styles := map[string]lipgloss.Style{
+		"critical": styleCritical, "high": styleHigh, "active": styleActive, "paused": stylePaused,
+		"project": styleProject, "tag": styleTag, "overdue": styleOverdue, "error": styleError,
+		"ok": styleOK, "key": styleKey,
+	}
+	for name, st := range styles {
+		c, ok := st.GetForeground().(lipgloss.Color)
+		if !ok {
+			t.Errorf("%s: foreground is not a plain color", name)
+			continue
+		}
+		var n int
+		if _, err := fmt.Sscan(string(c), &n); err != nil || n < 0 || n > 15 {
+			t.Errorf("%s: color %q is not a palette index 0-15", name, c)
+		}
 	}
 }
 

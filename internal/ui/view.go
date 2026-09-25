@@ -10,22 +10,23 @@ import (
 	"github.com/naggie/dstask"
 )
 
-// Colors follow the dstask CLI's own key: red for critical, orange for high,
-// dim for low, and a highlight for active tasks.
+// Colors are ANSI palette indexes 0 to 15, not fixed values, so the terminal
+// theme decides the real color. Herdr gives a plugin no way to read its own
+// theme, so the terminal palette is the only theme the pane can follow.
 var (
 	styleTitle    = lipgloss.NewStyle().Bold(true)
 	styleDim      = lipgloss.NewStyle().Faint(true)
-	styleCritical = lipgloss.NewStyle().Foreground(lipgloss.Color("160")).Bold(true)
-	styleHigh     = lipgloss.NewStyle().Foreground(lipgloss.Color("166"))
-	styleLow      = lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
-	styleActive   = lipgloss.NewStyle().Foreground(lipgloss.Color("42")).Bold(true)
-	stylePaused   = lipgloss.NewStyle().Foreground(lipgloss.Color("214"))
-	styleProject  = lipgloss.NewStyle().Foreground(lipgloss.Color("111"))
-	styleTag      = lipgloss.NewStyle().Foreground(lipgloss.Color("139"))
-	styleOverdue  = lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Bold(true)
-	styleError    = lipgloss.NewStyle().Foreground(lipgloss.Color("203"))
-	styleOK       = lipgloss.NewStyle().Foreground(lipgloss.Color("42"))
-	styleKey      = lipgloss.NewStyle().Foreground(lipgloss.Color("111")).Bold(true)
+	styleCritical = lipgloss.NewStyle().Foreground(lipgloss.Color("1")).Bold(true)
+	styleHigh     = lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
+	styleLow      = lipgloss.NewStyle().Faint(true)
+	styleActive   = lipgloss.NewStyle().Foreground(lipgloss.Color("2")).Bold(true)
+	stylePaused   = lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
+	styleProject  = lipgloss.NewStyle().Foreground(lipgloss.Color("4"))
+	styleTag      = lipgloss.NewStyle().Foreground(lipgloss.Color("5"))
+	styleOverdue  = lipgloss.NewStyle().Foreground(lipgloss.Color("9")).Bold(true)
+	styleError    = lipgloss.NewStyle().Foreground(lipgloss.Color("1"))
+	styleOK       = lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
+	styleKey      = lipgloss.NewStyle().Foreground(lipgloss.Color("6")).Bold(true)
 )
 
 // View renders the current mode.
@@ -47,7 +48,7 @@ func (m Model) viewList() string {
 	var b strings.Builder
 	b.WriteString(m.header())
 	b.WriteByte('\n')
-	b.WriteString(styleDim.Render(fit(fmt.Sprintf("  %4s %-2s %-1s %-16s %s", "ID", "", "", "PROJECT", "SUMMARY"), m.width)))
+	b.WriteString(styleDim.Render(fit(fmt.Sprintf("  %4s %-1s %-1s %-16s %s", "ID", "", "", "PROJECT", "SUMMARY"), m.width)))
 	b.WriteByte('\n')
 
 	rows := m.listRows()
@@ -132,7 +133,7 @@ func (m Model) row(t dstask.Task, selected bool) string {
 	glyph, glyphStyle := statusMark(t.Status)
 	line := gutter.Render(bar) + sp +
 		seg(styleDim, id) + sp +
-		seg(lipgloss.NewStyle(), priorityMark(t.Priority)) + sp +
+		seg(priorityStyle(t.Priority), priorityMark(t.Priority)) + sp +
 		seg(glyphStyle, glyph) + sp +
 		seg(styleProject, fmt.Sprintf("%-16s", ansi.Truncate(t.Project, 16, "…"))) + sp +
 		seg(summaryStyle(t), t.Summary)
@@ -180,15 +181,15 @@ func (m Model) dueLabel(t dstask.Task) string {
 	return st.Render(label)
 }
 
-// priorityMarks are colored circles in traffic-light order, so the rank reads
-// from color alone. Each is one code point that terminals draw two columns
-// wide. An emoji that needs a variation selector, such as ⬆️, is drawn at
-// different widths by different terminals and would break the columns.
+// priorityMarks are quiet one-column dots. Only P0 and P1 are solid, so the
+// tasks that need attention stand out, and the priority style gives each its
+// color. Emoji are not used: they carry their own colors, which ignore the
+// terminal theme.
 var priorityMarks = map[string]string{
-	dstask.PRIORITY_CRITICAL: "🔴",
-	dstask.PRIORITY_HIGH:     "🟠",
-	dstask.PRIORITY_NORMAL:   "🟡",
-	dstask.PRIORITY_LOW:      "🔵",
+	dstask.PRIORITY_CRITICAL: "●",
+	dstask.PRIORITY_HIGH:     "●",
+	dstask.PRIORITY_NORMAL:   "○",
+	dstask.PRIORITY_LOW:      "·",
 }
 
 // priorityMark is the circle for a priority. dstask validates priorities, so
@@ -197,7 +198,7 @@ func priorityMark(p string) string {
 	if mark, ok := priorityMarks[p]; ok {
 		return mark
 	}
-	return "  "
+	return " "
 }
 
 func priorityStyle(p string) lipgloss.Style {
@@ -314,7 +315,7 @@ func (m Model) detailBody(t dstask.Task) string {
 	}
 	var b strings.Builder
 	b.WriteString(field("status", strings.TrimSpace(statusGlyph(t.Status)+" "+t.Status)))
-	b.WriteString(field("priority", priorityMark(t.Priority)+" "+priorityStyle(t.Priority).Render(t.Priority)))
+	b.WriteString(field("priority", priorityStyle(t.Priority).Render(priorityMark(t.Priority)+" "+t.Priority)))
 	if t.Project != "" {
 		b.WriteString(field("project", styleProject.Render(t.Project)))
 	}
