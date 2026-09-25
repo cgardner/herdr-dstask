@@ -326,3 +326,95 @@ func TestQuietCapturesOutput(t *testing.T) {
 		t.Errorf("library wrote to stdout: %q", buf[:n])
 	}
 }
+
+func TestNewOpensTheConfiguredRepository(t *testing.T) {
+	s := repo(t)
+	t.Setenv("DSTASK_GIT_REPO", s.Repo())
+	got, err := New()
+	if err != nil || got.Repo() != s.Repo() {
+		t.Fatalf("got=%v err=%v", got, err)
+	}
+}
+
+func TestNewRefusesAMissingRepository(t *testing.T) {
+	t.Setenv("DSTASK_GIT_REPO", filepath.Join(t.TempDir(), "missing"))
+	if _, err := New(); err == nil || !strings.Contains(err.Error(), "no dstask repository") {
+		t.Fatalf("err = %v", err)
+	}
+}
+
+// git explains a failure on stderr. quiet captures it, so the error names the
+// cause and not only an exit status.
+func TestGitFailuresCarryGitsExplanation(t *testing.T) {
+	s := repo(t)
+	mustAdd(t, s, "only commit")
+	err := s.Undo() // HEAD~1 does not exist in a repository with one commit
+	if err == nil {
+		t.Fatal("expected an error")
+	}
+	if !strings.Contains(err.Error(), ": ") || strings.HasSuffix(err.Error(), "exit status 128") {
+		t.Errorf("error lacks git's explanation: %v", err)
+	}
+}
+
+func TestEditCommandUsesTheEditor(t *testing.T) {
+	s := repo(t)
+	task := mustAdd(t, s, "pick an editor")
+	t.Setenv("EDITOR", "nano -w")
+	ed, err := s.EditTask(task.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ed.Discard()
+	args := ed.Command().Args
+	if args[0] != "nano" || args[1] != "-w" || args[2] != ed.path {
+		t.Errorf("args = %v", args)
+	}
+
+	t.Setenv("EDITOR", "")
+	ed2, _ := s.EditNotes(task.ID)
+	defer ed2.Discard()
+	if ed2.Command().Args[0] != "vim" {
+		t.Errorf("empty EDITOR should fall back to vim, as dstask does")
+	}
+}
+
+func TestDiscardRemovesTheFile(t *testing.T) {
+	s := repo(t)
+	task := mustAdd(t, s, "never mind")
+	ed, _ := s.EditTask(task.ID)
+	ed.Discard()
+	if _, err := os.Stat(ed.path); !os.IsNotExist(err) {
+		t.Errorf("file still present")
+	}
+	if open, _ := s.Open(); open[0].Summary != "never mind" {
+		t.Errorf("discard changed the task")
+	}
+}
+
+func TestEditOfAnUnknownIDFails(t *testing.T) {
+	s := repo(t)
+	if _, err := s.EditTask(5); err == nil {
+		t.Fatal("expected an error")
+	}
+}
+
+// If the list changes while the editor is open, the ID can point at another
+// task. Apply must refuse rather than overwrite that task.
+func TestEditRefusesWhenTheIDMovedToAnotherTask(t *testing.T) {
+	s := repo(t)
+	task := mustAdd(t, s, "first")
+	ed, _ := s.EditTask(task.ID)
+	if err := s.Remove(task.ID); err != nil {
+		t.Fatal(err)
+	}
+	mustAdd(t, s, "second") // takes ID 1
+	err := ed.Apply()
+	if err == nil || !strings.Contains(err.Error(), "changed while the editor was open") {
+		t.Fatalf("err = %v", err)
+	}
+	os.Remove(ed.path + ".kept")
+	if open, _ := s.Open(); open[0].Summary != "second" {
+		t.Errorf("the other task was overwritten: %+v", open[0])
+	}
+}

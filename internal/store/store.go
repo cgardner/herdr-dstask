@@ -51,12 +51,14 @@ func New() (*Store, error) {
 	return &Store{conf: conf}, nil
 }
 
-// NewAt opens a repository at an explicit path. Tests use it.
+// NewAt opens a repository at an explicit path, and otherwise behaves as New
+// does: DSTASK_CONTEXT still applies. Tests use it.
 func NewAt(repo string) *Store {
 	conf := dstask.Config{
-		Repo:      repo,
-		StateFile: repo + "/.git/dstask/state.bin",
-		IDsFile:   repo + "/.git/dstask/ids.bin",
+		CtxFromEnvVar: os.Getenv("DSTASK_CONTEXT"),
+		Repo:          repo,
+		StateFile:     repo + "/.git/dstask/state.bin",
+		IDsFile:       repo + "/.git/dstask/ids.bin",
 	}
 	return &Store{conf: conf}
 }

@@ -3,6 +3,7 @@ package ui
 import (
 	"errors"
 	"fmt"
+	"os/exec"
 	"strings"
 	"testing"
 	"time"
@@ -17,6 +18,7 @@ type fake struct {
 	calls          []string
 	ignore         bool
 	fail           error
+	ed             *fakeEditor
 }
 
 func (f *fake) Open() ([]dstask.Task, error)     { return f.open, nil }
@@ -32,8 +34,26 @@ func (f *fake) Undo() error                      { return f.record("undo") }
 func (f *fake) Add(in string) error              { return f.record("add " + in) }
 func (f *fake) Modify(id int, s string) error    { return f.record(fmt.Sprintf("modify %d %s", id, s)) }
 func (f *fake) Note(id int, s string) error      { return f.record(fmt.Sprintf("note %d %s", id, s)) }
-func (f *fake) EditTask(id int) (Editor, error)  { return nil, errors.New("no editor in tests") }
-func (f *fake) EditNotes(id int) (Editor, error) { return nil, errors.New("no editor in tests") }
+func (f *fake) EditTask(id int) (Editor, error)  { return f.editor(fmt.Sprint("edit ", id)) }
+func (f *fake) EditNotes(id int) (Editor, error) { return f.editor(fmt.Sprint("edit-notes ", id)) }
+
+func (f *fake) editor(call string) (Editor, error) {
+	if f.ed == nil {
+		return nil, errors.New("no editor in tests")
+	}
+	f.calls = append(f.calls, call)
+	return f.ed, nil
+}
+
+// fakeEditor records whether the UI saved or dropped the edit.
+type fakeEditor struct {
+	applied, discarded bool
+	applyErr           error
+}
+
+func (e *fakeEditor) Command() *exec.Cmd { return exec.Command("true") }
+func (e *fakeEditor) Apply() error       { e.applied = true; return e.applyErr }
+func (e *fakeEditor) Discard()           { e.discarded = true }
 
 func tasks() []dstask.Task {
 	return []dstask.Task{

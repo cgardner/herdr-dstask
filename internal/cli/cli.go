@@ -30,6 +30,18 @@ func editor(e *store.Edit, err error) (ui.Editor, error) {
 	return e, nil
 }
 
+// Seams. Each reaches outside the process, and a test replaces it.
+var (
+	// openStore opens the repository that dstask itself would use.
+	openStore = store.New
+
+	// runProgram is the one call that needs a real terminal.
+	runProgram = func(m ui.Model) error {
+		_, err := tea.NewProgram(m, tea.WithAltScreen()).Run()
+		return err
+	}
+)
+
 // Run is the whole program. It returns the process exit status.
 func Run(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("herdr-dstask", flag.ContinueOnError)
@@ -45,7 +57,7 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		return 0
 	}
 
-	s, err := store.New()
+	s, err := openStore()
 	if err != nil {
 		fmt.Fprintln(stderr, "herdr-dstask:", err)
 		return 1
@@ -64,7 +76,7 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		return 0
 	}
 
-	if _, err := tea.NewProgram(ui.New(backend{s}), tea.WithAltScreen()).Run(); err != nil {
+	if err := runProgram(ui.New(backend{s})); err != nil {
 		fmt.Fprintln(stderr, "herdr-dstask:", err)
 		return 1
 	}

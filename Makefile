@@ -1,6 +1,7 @@
 BINARY  := herdr-dstask
 VERSION := $(shell sed -n 's/^version = "\(.*\)"/\1/p' herdr-plugin.toml | head -1)
 LDFLAGS := -s -w -X github.com/cgardner/herdr-dstask/internal/cli.version=$(VERSION)
+COVER_MIN := 90.0
 
 .DEFAULT_GOAL := build
 
@@ -14,6 +15,22 @@ build: ## Build the plugin binary into bin/
 test: ## Run the test suite (it never touches ~/.dstask)
 	@go test ./...
 
+# Coverage measures every internal package plus the root main. -coverpkg makes
+# a call from one package into another count, so a helper used only through a
+# sibling package does not read as dead.
+COVER_PKGS := ./internal/...,.
+
+.PHONY: cover
+cover: ## Run tests and fail below COVER_MIN percent of statements
+	@go test ./... -covermode=count -coverpkg=$(COVER_PKGS) -coverprofile=cover.out >/dev/null
+	@go tool cover -func=cover.out | tail -1
+	@go tool cover -func=cover.out | tail -1 | awk '{gsub(/%/,"",$$3); \
+	  if ($$3+0 < $(COVER_MIN)) { printf "coverage %.1f%% is below the %s%% floor\n", $$3, "$(COVER_MIN)"; exit 1 } }'
+
+.PHONY: cover-html
+cover-html: cover ## Open the coverage report in a browser
+	@go tool cover -html=cover.out
+
 .PHONY: lint
 lint: ## Fail if anything is unformatted or vet reports a problem
 	@test -z "$$(gofmt -l .)" || { echo "gofmt needed:"; gofmt -l .; exit 1; }
@@ -24,7 +41,7 @@ fmt: ## Rewrite sources with gofmt
 	@gofmt -w .
 
 .PHONY: ci
-ci: lint test ## Everything CI would run
+ci: lint cover ## Everything CI would run
 
 .PHONY: link
 link: build ## Link this working copy into the running Herdr session
@@ -49,7 +66,7 @@ sandbox: build ## Open the popup on a copy of ~/.dstask (FRESH=1 copies again)
 
 .PHONY: clean
 clean: ## Remove build output
-	@rm -rf bin
+	@rm -rf bin cover.out
 
 .PHONY: help
 help: ## List the targets

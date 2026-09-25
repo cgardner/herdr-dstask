@@ -381,6 +381,9 @@ func (m Model) updateDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.openPrompt(promptAdd, "")
 	case "u":
 		return m, act("undid the last change", m.backend.Undo)
+	case "r":
+		m.loading = true
+		return m, m.load()
 	case "j", "k", "down", "up", "ctrl+d", "ctrl+u", "pgdown", "pgup", "g", "G", "home", "end":
 		switch msg.String() {
 		case "g", "home":
@@ -449,13 +452,19 @@ func (m Model) runEditor(open func(int) (Editor, error), id int, ok string) (tea
 		m.setErr(err)
 		return m, nil
 	}
-	return m, tea.ExecProcess(ed.Command(), func(err error) tea.Msg {
+	return m, tea.ExecProcess(ed.Command(), editorDone(ed, ok))
+}
+
+// editorDone saves the edit when the editor exits cleanly and drops it when
+// the editor fails. Bubble Tea calls it after it gives the terminal back.
+func editorDone(ed Editor, ok string) func(error) tea.Msg {
+	return func(err error) tea.Msg {
 		if err != nil {
 			ed.Discard()
 			return actionMsg{err: fmt.Errorf("editor: %w; nothing saved", err)}
 		}
 		return actionMsg{ok: ok, err: ed.Apply()}
-	})
+	}
 }
 
 func (m Model) openPrompt(kind promptKind, value string) (tea.Model, tea.Cmd) {

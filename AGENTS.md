@@ -50,3 +50,15 @@ the TUI, set `DSTASK_GIT_REPO` to a scratch repository.
 Keys sent fast with `herdr pane send-keys` can arrive together, and Bubble
 Tea reads `esc` then `k` as `alt+k`. Send one key for each call, with a
 short pause.
+
+## Coverage floor
+
+`make cover` fails below 90% of statements, and `make ci` runs it. Coverage
+uses `-coverpkg` over `./internal/...` and the root, so a call from one
+package into another counts.
+
+Code that reaches outside the process sits behind a package variable that a
+test replaces: `cli.openStore` and `cli.runProgram`. The editor callback is
+`ui.editorDone`, a named function, because a test cannot reach a closure
+inside `tea.ExecProcess`. Keep a new outside call behind the same pattern.
+Only `main` and a few error returns for disk failures are not covered.
