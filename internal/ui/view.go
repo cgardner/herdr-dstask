@@ -146,17 +146,15 @@ func (m Model) row(t dstask.Task, selected bool) string {
 	return fill(line, m.width, base)
 }
 
-// idWidth is one column more than the longest ID in the loaded list, and never
-// less than the "ID" heading. It follows every loaded task, not only the
-// visible ones, so the columns do not move while a filter narrows the list.
+// idWidth is the length of the longest ID in the loaded list, and never less
+// than the "ID" heading. It follows every loaded task, not only the visible
+// ones, so the columns do not move while a filter narrows the list.
 func (m Model) idWidth() int {
-	longest := 1
+	longest := len("ID")
 	for _, t := range m.all {
-		if n := len(fmt.Sprint(t.ID)); n > longest {
-			longest = n
-		}
+		longest = max(longest, len(fmt.Sprint(t.ID)))
 	}
-	return max(len("ID"), longest+1)
+	return longest
 }
 
 // fill truncates a composed line to the width and pads it out with the row

@@ -358,15 +358,16 @@ func TestRowsStayAlignedAcrossPriorities(t *testing.T) {
 	}
 }
 
-func TestIDColumnIsOneWiderThanTheLongestID(t *testing.T) {
+func TestIDColumnFitsTheLongestID(t *testing.T) {
 	for _, c := range []struct {
 		ids  []int
 		want int
 	}{
 		{nil, 2},            // the heading "ID" sets the minimum
-		{[]int{3, 7, 9}, 2}, // one digit plus one space
-		{[]int{7, 42}, 3},
-		{[]int{7, 178}, 4},
+		{[]int{3, 7, 9}, 2}, // one digit, but the heading needs two
+		{[]int{7, 42}, 2},
+		{[]int{7, 178}, 3},
+		{[]int{7, 1000}, 4},
 		{[]int{0}, 2}, // a resolved task shows "–"
 	} {
 		var open []dstask.Task
@@ -398,7 +399,7 @@ func TestIDColumnIgnoresTheFilter(t *testing.T) {
 	}
 	m := start(t, &fake{open: open})
 	m = drive(t, m, append([]tea.Msg{key("/")}, typed("short")...)...)
-	if len(m.visible) != 1 || m.idWidth() != 4 {
+	if len(m.visible) != 1 || m.idWidth() != 3 {
 		t.Errorf("visible=%d width=%d; a filter must not change the width", len(m.visible), m.idWidth())
 	}
 }
