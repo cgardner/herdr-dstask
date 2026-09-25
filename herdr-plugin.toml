@@ -1,0 +1,34 @@
+id = "cgardner.herdr-dstask"
+name = "herdr-dstask"
+version = "0.1.0"
+
+# Verified against 0.9.1.
+min_herdr_version = "0.9.0"
+description = "dstask in the control plane. Lists, shows and changes dstask tasks in a popup, through the dstask library."
+platforms = ["macos", "linux"]
+
+# `plugin link` users run `make build` by hand. The build hook compiles from
+# source because no release binaries exist yet.
+[[build]]
+command = ["bash", "scripts/install.sh"]
+
+# The task list. A popup keeps the agents visible behind it, which matters
+# when the point is deciding what to hand to one of them.
+[[panes]]
+id = "tasks"
+title = "dstask"
+placement = "popup"
+width = "90%"
+height = "85%"
+command = ["sh", "-c", "exec \"$HERDR_PLUGIN_ROOT/bin/herdr-dstask\""]
+
+[[actions]]
+id = "open"
+title = "dstask: tasks"
+contexts = ["global", "workspace", "pane"]
+description = "Open the dstask task list."
+command = [
+  "sh",
+  "-c",
+  "exec \"${HERDR_BIN_PATH:-herdr}\" plugin pane open --plugin cgardner.herdr-dstask --entrypoint tasks --focus",
+]
