@@ -11,6 +11,8 @@ CLI uses.
 
 ![The task list, showing invented tasks](docs/images/screenshot.png)
 
+![The detail view of one task, with its notes](docs/images/detail.png)
+
 ## Install
 
 ```sh

@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 
 	"github.com/cgardner/herdr-dstask/internal/store"
 )
@@ -55,7 +56,16 @@ func main() {
 	fail(s.Start(2))
 	fail(s.Start(5))
 	fail(s.Stop(5))
-	fail(s.Note(2, "Drain the old queue before the cut-over, then flip the feature flag."))
+	// Notes for the detail screenshot: prose and a checklist, as real notes
+	// often have.
+	fail(s.Note(2, strings.Join([]string{
+		"Drain the old queue before the cut-over, then flip the feature flag.",
+		"",
+		"- [x] mirror traffic to the new broker",
+		"- [x] compare delivery latency for a week",
+		"- [ ] drain the old queue",
+		"- [ ] remove the old client library",
+	}, "\n")))
 }
 
 func fail(err error) {

@@ -9,9 +9,12 @@ script only has to paint each cell at its grid position.
 ANSI palette colors are drawn with Catppuccin Mocha, Herdr's default theme,
 because the plugin uses palette indexes and the terminal theme decides them.
 
-Usage: screenshot.py <capture.ansi> <out-dir>
-Writes <out-dir>/screenshot.svg and <out-dir>/social-preview.svg. Convert them
-with rsvg-convert, as `make screenshot` does.
+Usage: screenshot.py <capture.ansi> <out-dir> <name> [--social] [--cols N]
+Writes <out-dir>/<name>.svg, and with --social also
+<out-dir>/social-preview.svg. Convert them with rsvg-convert, as
+`make screenshot` does. --cols sets the screen width. Pass the pane width, so
+that every image of one run has the same size; without it the width is the
+longest line.
 """
 
 import html
@@ -127,6 +130,12 @@ def terminal(rows, cols, x0, y0):
     """The SVG elements that paint the rows inside a window at x0, y0."""
     out = []
     for r, cells in enumerate(rows):
+        # The capture comes back a few cells short of the pane on a row that
+        # ends in colored blanks, but the UI writes the selection background
+        # across the full width (a UI test asserts it). Extend such a row, so
+        # the highlight reaches the edge as it does on screen.
+        if cells and cells[-1][2] and cells[-1][0] == " ":
+            cells = cells + [cells[-1]] * (cols - len(cells))
         y = y0 + r * CELL_H
         # Backgrounds first, in runs, so the text sits on top.
         c = 0
@@ -188,15 +197,21 @@ def svg(width, height, body, bg=None):
 
 
 def main():
-    capture, out = sys.argv[1], sys.argv[2]
+    capture, out, name = sys.argv[1], sys.argv[2], sys.argv[3]
+    flags = sys.argv[4:]
+    social = "--social" in flags
     with open(capture, encoding="utf-8") as f:
         rows = crop([parse(line.rstrip("\n")) for line in f])
     cols = max(len("".join(c[0] for c in r).rstrip()) for r in rows)
+    if "--cols" in flags:
+        cols = int(flags[flags.index("--cols") + 1])
 
-    # The README screenshot: the window alone on a transparent canvas.
+    # A README screenshot: the window alone on a transparent canvas.
     parts, w, h = window(rows, cols, 1, 1, "herdr · dstask")
-    with open(out + "/screenshot.svg", "w", encoding="utf-8") as f:
+    with open(out + "/" + name + ".svg", "w", encoding="utf-8") as f:
         f.write(svg(int(w) + 2, int(h) + 2, parts))
+    if not social:
+        return
 
     # The social preview: GitHub's 1280x640, with the name above the window.
     W, H = 1280, 640

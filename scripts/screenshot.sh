@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Make docs/images/screenshot.png and docs/images/social-preview.png.
+# Make the README screenshots, docs/images/screenshot.png for the list and
+# docs/images/detail.png for a task, and docs/images/social-preview.png.
 #
 # It must run inside Herdr, because Herdr is the terminal emulator: it runs
 # `make demo` in a pane of a fixed width, reads the finished screen back with
@@ -38,11 +39,17 @@ herdr pane run "$pane" "bash scripts/demo.sh" >/dev/null
 herdr pane wait-output "$pane" --match "build a cold frame" --timeout 60000 >/dev/null
 herdr pane send-text "$pane" j >/dev/null # select the active task
 sleep 0.5
-herdr pane read "$pane" --source visible --format ansi >"$work/capture.ansi"
+herdr pane read "$pane" --source visible --format ansi >"$work/list.ansi"
 
-python3 scripts/screenshot.py "$work/capture.ansi" "$work"
+herdr pane send-keys "$pane" enter >/dev/null # open it
+herdr pane wait-output "$pane" --match "remove the old client library" --timeout 10000 >/dev/null
+sleep 0.5
+herdr pane read "$pane" --source visible --format ansi >"$work/detail.ansi"
+
+python3 scripts/screenshot.py "$work/list.ansi" "$work" screenshot --social --cols "$WIDTH"
+python3 scripts/screenshot.py "$work/detail.ansi" "$work" detail --cols "$WIDTH"
 mkdir -p docs/images
-for name in screenshot social-preview; do
+for name in screenshot detail social-preview; do
   rsvg-convert -z 2 "$work/$name.svg" -o "docs/images/$name.png"
   echo "wrote docs/images/$name.png"
 done
