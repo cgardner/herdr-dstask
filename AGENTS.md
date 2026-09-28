@@ -79,3 +79,28 @@ herdr-switcher-plus.
 The priority column is a one-column dot: `●` for P0 and P1, `○` for P2, `·`
 for P3, colored by priority. Do not use emoji. They carry their own colors,
 which ignore the theme.
+
+## Releasing
+
+The setup is the same as in herdr-switcher-plus. A conventional commit on
+`main` opens a release pull request through release-please. It bumps
+`version` in `herdr-plugin.toml` and writes `CHANGELOG.md`. Merging it tags
+the release, and the build job in the same workflow cross-compiles the four
+platforms, writes `SHA256SUMS` and attaches them.
+
+- The build runs inside `release-please.yml`, not in a workflow that listens
+  for the tag. GitHub does not start a workflow from an event that
+  `GITHUB_TOKEN` creates, so a tag that release-please pushes never fires
+  `on: push: tags`. `release.yml` covers a tag pushed by hand. Both call
+  `build-release.yml`.
+- Three places carry the version and all three must agree: the git tag,
+  `version` in `herdr-plugin.toml`, and the download URL that
+  `scripts/install.sh` builds from that version. The build fails a tag that
+  disagrees with the manifest.
+- The manifest starts empty with `initial-version` set to 0.1.0. A manifest
+  that names a version before any release makes release-please skip it.
+- The `PLATFORMS` list in the `Makefile` and the `uname` cases in
+  `scripts/install.sh` name the same four targets. Change both or neither.
+- GitHub blocks Actions from opening pull requests unless the repository
+  allows it, under Settings, Actions, General, Workflow permissions.
+- Do not edit `CHANGELOG.md` by hand.

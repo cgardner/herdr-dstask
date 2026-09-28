@@ -1,0 +1,51 @@
+name: build-release
+
+# Called by release-please after it cuts a release, and by the tag workflow
+# when a tag is pushed by hand. Both need identical build and upload steps, so
+# they live here once.
+on:
+  workflow_call:
+    inputs:
+      tag:
+        description: The release tag to build and attach assets to.
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    # Go cross-compiles, so one runner produces every target. No build matrix
+    # is needed, unlike a cgo or Rust plugin.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: The tag must match the manifest version
+        # scripts/install.sh builds its download URL from the manifest version.
+        # A tag that disagrees would publish assets nobody can fetch.
+        run: |
+          tag="${TAG#v}"
+          manifest="$(make version)"
+          if [ "$tag" != "$manifest" ]; then
+            echo "tag v$tag does not match herdr-plugin.toml version $manifest" >&2
+            exit 1
+          fi
+        env:
+          TAG: ${{ inputs.tag }}
+
+      - run: make ci
+      - run: make checksums
+
+      - name: Attach the binaries to the release
+        run: gh release upload "$TAG" dist/herdr-dstask-* dist/SHA256SUMS --clobber
+        env:
+          TAG: ${{ inputs.tag }}
+          GH_TOKEN: ${{ github.token }}

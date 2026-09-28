@@ -1,0 +1,55 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    # The plugin ships for macOS and Linux, and the store tests run real git
+    # against a temporary repository, so both are exercised rather than assumed.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - run: make ci
+
+  cross-build:
+    # Catch a break in any released target without waiting for a tag.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - run: make dist
+
+  manifest:
+    # The manifest version drives the release asset URL in scripts/install.sh,
+    # so a malformed or missing version has to fail here rather than at a
+    # user's install.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: The manifest version must be semantic
+        run: |
+          version="$(make version)"
+          echo "manifest version: $version"
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+            echo "herdr-plugin.toml version '$version' is not MAJOR.MINOR.PATCH" >&2
+            exit 1
+          }
+      - name: The build hook must be valid shell
+        run: bash -n scripts/install.sh

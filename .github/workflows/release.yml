@@ -1,0 +1,17 @@
+name: release
+
+# For a tag pushed by hand. A tag from release-please arrives through the
+# release-please workflow instead, because GitHub does not start a workflow
+# from an event created with GITHUB_TOKEN.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    uses: ./.github/workflows/build-release.yml
+    with:
+      tag: ${{ github.ref_name }}

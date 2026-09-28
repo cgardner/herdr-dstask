@@ -2,6 +2,11 @@ BINARY  := herdr-dstask
 VERSION := $(shell sed -n 's/^version = "\(.*\)"/\1/p' herdr-plugin.toml | head -1)
 LDFLAGS := -s -w -X github.com/cgardner/herdr-dstask/internal/cli.version=$(VERSION)
 COVER_MIN := 90.0
+DIST      := dist
+
+# Platforms released as prebuilt binaries. scripts/install.sh maps uname
+# output onto these same names, so the two lists must stay in step.
+PLATFORMS := darwin-arm64 darwin-amd64 linux-amd64 linux-arm64
 
 .DEFAULT_GOAL := build
 
@@ -43,6 +48,24 @@ fmt: ## Rewrite sources with gofmt
 .PHONY: ci
 ci: lint cover ## Everything CI would run
 
+.PHONY: dist
+dist: ## Cross-compile a release binary for every platform
+	@rm -rf $(DIST) && mkdir -p $(DIST)
+	@for p in $(PLATFORMS); do \
+	  os=$${p%-*}; arch=$${p#*-}; \
+	  GOOS=$$os GOARCH=$$arch CGO_ENABLED=0 \
+	    go build -trimpath -ldflags '$(LDFLAGS)' -o $(DIST)/$(BINARY)-$$p . || exit 1; \
+	  echo "built $(DIST)/$(BINARY)-$$p"; \
+	done
+
+.PHONY: checksums
+checksums: dist ## Write a SHA256SUMS file beside the release binaries
+	@cd $(DIST) && shasum -a 256 $(BINARY)-* > SHA256SUMS && cat SHA256SUMS
+
+.PHONY: version
+version: ## Print the version recorded in herdr-plugin.toml
+	@echo $(VERSION)
+
 .PHONY: link
 link: build ## Link this working copy into the running Herdr session
 	@herdr plugin link "$(CURDIR)" >/dev/null
@@ -66,7 +89,7 @@ sandbox: build ## Open the popup on a copy of ~/.dstask (FRESH=1 copies again)
 
 .PHONY: clean
 clean: ## Remove build output
-	@rm -rf bin cover.out
+	@rm -rf bin $(DIST) cover.out
 
 .PHONY: help
 help: ## List the targets

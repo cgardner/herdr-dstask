@@ -7,8 +7,9 @@ min_herdr_version = "0.9.0"
 description = "dstask in the control plane. Lists, shows and changes dstask tasks in a popup, through the dstask library."
 platforms = ["macos", "linux"]
 
-# `plugin link` users run `make build` by hand. The build hook compiles from
-# source because no release binaries exist yet.
+# A GitHub install fetches the prebuilt binary for the platform and compiles
+# only when no release asset matches, so the Go toolchain is a fallback rather
+# than a requirement. `plugin link` users run `make build` by hand.
 [[build]]
 command = ["bash", "scripts/install.sh"]
 

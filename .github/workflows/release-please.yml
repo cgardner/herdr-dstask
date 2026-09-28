@@ -1,0 +1,37 @@
+name: release-please
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    # Opens a release pull request that bumps the version and the changelog.
+    # Merging it tags the release and sets release_created.
+    runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+    steps:
+      - uses: googleapis/release-please-action@v4
+        id: release
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  # The build runs here rather than in a separate workflow listening for the
+  # tag. GitHub does not start a workflow from an event created with
+  # GITHUB_TOKEN, so a tag that release-please pushes never fires an
+  # `on: push: tags` trigger. herdr-switcher-plus learned this when its v0.1.0
+  # was tagged and released with no binaries, which sent every install to a
+  # source build.
+  build:
+    needs: release-please
+    if: needs.release-please.outputs.release_created == 'true'
+    uses: ./.github/workflows/build-release.yml
+    with:
+      tag: ${{ needs.release-please.outputs.tag_name }}
