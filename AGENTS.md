@@ -103,7 +103,9 @@ platforms, writes `SHA256SUMS` and attaches them.
   `scripts/install.sh` name the same four targets. Change both or neither.
 - GitHub blocks Actions from opening pull requests unless the repository
   allows it, under Settings, Actions, General, Workflow permissions.
-- Do not edit `CHANGELOG.md` by hand, and keep it to its `# Changelog`
-  title before the first release. release-please puts its section under the
-  title and pushes any other text below it, under a new `## Changelog`
-  heading. herdr-switcher-plus still carries that stray heading.
+- Do not edit `CHANGELOG.md` by hand. Before the first release the file must
+  not exist. On a first release, release-please keeps any existing file below
+  its new section and changes its `# Changelog` title to `## Changelog`, so
+  even a file with only the title leaves a stray heading at the end.
+  herdr-switcher-plus still carries one. From the second release on, the
+  sections go under the title correctly.
