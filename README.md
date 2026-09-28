@@ -9,6 +9,8 @@ library, `github.com/naggie/dstask`. It does not run the `dstask` binary. The
 repository, the context and the commit history are the same ones that the
 CLI uses.
 
+![The task list, showing invented tasks](docs/images/screenshot.png)
+
 ## Install
 
 ```sh
@@ -42,6 +44,9 @@ description = "dstask tasks (sandbox copy)"
 
 A GitHub install downloads a prebuilt binary for macOS or Linux (arm64 and
 amd64). It builds from source only when no binary matches, and that needs Go.
+
+`make demo` opens the UI on invented tasks. `make screenshot`, run inside
+Herdr, remakes the README screenshot and the social preview from it.
 
 `make run` starts the UI in the current terminal, outside Herdr.
 `make list` prints the open tasks and does not start the UI.

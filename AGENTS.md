@@ -109,3 +109,24 @@ platforms, writes `SHA256SUMS` and attaches them.
   even a file with only the title leaves a stray heading at the end.
   herdr-switcher-plus still carries one. From the second release on, the
   sections go under the title correctly.
+
+## Screenshots show invented tasks only
+
+`make demo` runs the plugin on a repository that `tools/demofixture` invents.
+Every image in the documentation comes from it. A real task list names an
+employer, colleagues, customers and private work, and this repository is
+public. Take new fixture tasks from the invented projects that
+`tools/demofixture` already uses.
+
+`make screenshot` runs the demo in a Herdr pane of 115 columns, reads the
+screen back with `herdr pane read --format ansi`, and `scripts/screenshot.py`
+paints it with the Catppuccin Mocha palette. Two traps cost time here:
+
+- `rsvg-convert` honors neither `textLength` on a run with trailing spaces nor
+  a list of `x` positions. Each glyph is its own `<text>` element, or the
+  columns drift.
+- The pattern that strips cursor sequences must not match SGR, which also
+  ends in a letter. Without the exclusion of `m`, every color disappears.
+
+GitHub has no API for the social preview, so `docs/images/social-preview.png`
+is uploaded by hand, under Settings, General, Social preview.

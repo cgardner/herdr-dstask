@@ -87,6 +87,14 @@ list: build ## Print the open tasks without the UI
 sandbox: build ## Open the popup on a copy of ~/.dstask (FRESH=1 copies again)
 	@bash scripts/sandbox.sh $(if $(FRESH),--fresh)
 
+.PHONY: demo
+demo: build ## Open the plugin on invented tasks, for screenshots
+	@bash scripts/demo.sh
+
+.PHONY: screenshot
+screenshot: ## Remake the README screenshot and the social preview (inside Herdr)
+	@bash scripts/screenshot.sh
+
 .PHONY: clean
 clean: ## Remove build output
 	@rm -rf bin $(DIST) cover.out
