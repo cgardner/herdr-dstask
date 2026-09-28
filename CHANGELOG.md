@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.0](https://github.com/cgardner/herdr-dstask/compare/v0.1.0...v0.2.0) (2026-09-28)
+
+
+### Features
+
+* add a project view with progress, and a project filter ([5469f85](https://github.com/cgardner/herdr-dstask/commit/5469f859ceb6b0f5905966ea7d5dd8d3d92fcd54))
+* sort the project view by urgency, progress, open or last done ([3b5cb0c](https://github.com/cgardner/herdr-dstask/commit/3b5cb0c19364886b6ee44e6d8f21e26e4cae4102))
+
 ## 0.1.0 (2026-09-28)
 
 
