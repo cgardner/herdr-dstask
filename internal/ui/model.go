@@ -288,21 +288,37 @@ func (m *Model) clamp() {
 	if m.cursor < 0 {
 		m.cursor = 0
 	}
+	// The list shows whole pages, as the Bubbles list in herdr-switcher-plus
+	// does, so the first row on screen is always the start of a page.
 	rows := m.listRows()
-	if m.cursor < m.offset {
-		m.offset = m.cursor
-	}
-	if m.cursor >= m.offset+rows {
-		m.offset = m.cursor - rows + 1
-	}
-	if m.offset < 0 {
-		m.offset = 0
-	}
+	m.offset = (m.cursor / rows) * rows
 }
 
-// listRows is the number of task rows that fit: the pane less the header,
-// the column titles and the footer.
-func (m Model) listRows() int { return max(1, m.height-4) }
+// listRows is the number of task rows on a page: the pane less the header,
+// the column titles and the footer, and less one more line for the page dots
+// when the tasks do not fit on one page.
+func (m Model) listRows() int {
+	rows := max(1, m.height-4)
+	if len(m.visible) > rows {
+		rows = max(1, m.height-5)
+	}
+	return rows
+}
+
+// pages is the number of pages, and page is the one the cursor is on.
+func (m Model) pages() int { return max(1, (len(m.visible)+m.listRows()-1)/m.listRows()) }
+func (m Model) page() int  { return m.cursor / m.listRows() }
+
+// turnPage moves by whole pages and keeps the cursor at the same place on the
+// page, as the Bubbles list does. On a short last page it stops at the last
+// task. At either end it does nothing.
+func (m *Model) turnPage(delta int) {
+	next := m.page() + delta
+	if next < 0 || next >= m.pages() {
+		return
+	}
+	m.cursor = min(m.cursor+delta*m.listRows(), len(m.visible)-1)
+}
 
 func (m Model) selected() (dstask.Task, bool) {
 	if m.cursor < 0 || m.cursor >= len(m.visible) {
@@ -350,11 +366,15 @@ func (m Model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.cursor = 0
 	case "G", "end":
 		m.cursor = len(m.visible) - 1
-	case "ctrl+d", "pgdown":
+	case "ctrl+d":
 		m.cursor += m.listRows() / 2
-	case "ctrl+u", "pgup":
+	case "ctrl+u":
 		m.cursor -= m.listRows() / 2
-	case "enter", "l", "right":
+	case "right", "l", "pgdown":
+		m.turnPage(1)
+	case "left", "h", "pgup":
+		m.turnPage(-1)
+	case "enter":
 		if t, ok := m.selected(); ok {
 			m.target = t
 			m.mode = modeDetail

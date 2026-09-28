@@ -403,3 +403,125 @@ func TestIDColumnIgnoresTheFilter(t *testing.T) {
 		t.Errorf("visible=%d width=%d; a filter must not change the width", len(m.visible), m.idWidth())
 	}
 }
+
+func manyTasks(n int) []dstask.Task {
+	var out []dstask.Task
+	for i := 1; i <= n; i++ {
+		out = append(out, dstask.Task{UUID: fmt.Sprint(i), ID: i, Summary: fmt.Sprintf("task %02d", i), Status: "pending", Priority: "P2"})
+	}
+	return out
+}
+
+// With a pane 20 rows high, a page is 15 tasks: the header, the column
+// titles, the dots and the footer take the other 5.
+func TestPagesTurnAndKeepThePlaceOnThePage(t *testing.T) {
+	m := start(t, &fake{open: manyTasks(40)})
+	if m.listRows() != 15 || m.pages() != 3 {
+		t.Fatalf("rows=%d pages=%d, want 15 and 3", m.listRows(), m.pages())
+	}
+	m = drive(t, m, key("j"), key("j"), key("l"))
+	if m.cursor != 17 || m.offset != 15 {
+		t.Fatalf("l: cursor=%d offset=%d, want 17 and 15", m.cursor, m.offset)
+	}
+	view := m.View()
+	if !strings.Contains(view, "task 16") || strings.Contains(view, "task 15") {
+		t.Errorf("page 2 should start at task 16")
+	}
+	// pgdown on the last page does nothing.
+	m = drive(t, m, key("right"), key("pgdown"))
+	if m.cursor != 32 || m.offset != 30 {
+		t.Errorf("last page: cursor=%d offset=%d, want 32 and 30", m.cursor, m.offset)
+	}
+	m = drive(t, m, key("h"))
+	if m.cursor != 17 || m.offset != 15 {
+		t.Errorf("h: cursor=%d offset=%d, want 17 and 15", m.cursor, m.offset)
+	}
+	// pgup on the first page does nothing.
+	m = drive(t, m, key("left"), key("pgup"))
+	if m.cursor != 2 || m.offset != 0 {
+		t.Errorf("first page: cursor=%d offset=%d, want 2 and 0", m.cursor, m.offset)
+	}
+}
+
+// The last page has 10 tasks. From the 15th row of page 2 there is no 15th
+// row on page 3, so the cursor stops at the last task.
+func TestAShortLastPageStopsAtTheLastTask(t *testing.T) {
+	m := start(t, &fake{open: manyTasks(40)})
+	m = drive(t, m, key("l"))
+	for i := 0; i < 14; i++ {
+		m = drive(t, m, key("j"))
+	}
+	if m.cursor != 29 {
+		t.Fatalf("setup: cursor=%d, want 29", m.cursor)
+	}
+	m = drive(t, m, key("l"))
+	if m.cursor != 39 || m.offset != 30 {
+		t.Errorf("cursor=%d offset=%d, want 39 and 30", m.cursor, m.offset)
+	}
+}
+
+func TestMovingPastThePageEdgeTurnsThePage(t *testing.T) {
+	m := start(t, &fake{open: manyTasks(40)})
+	for i := 0; i < 15; i++ {
+		m = drive(t, m, key("j"))
+	}
+	if m.cursor != 15 || m.offset != 15 {
+		t.Errorf("j past the edge: cursor=%d offset=%d, want 15 and 15", m.cursor, m.offset)
+	}
+	m = drive(t, m, key("k"))
+	if m.offset != 0 {
+		t.Errorf("k back over the edge should show page 1, offset=%d", m.offset)
+	}
+}
+
+func TestDotsShowThePages(t *testing.T) {
+	m := start(t, &fake{open: manyTasks(40)})
+	m = drive(t, m, key("l"))
+	lines := strings.Split(m.View(), "\n")
+	dots := stripSGR(lines[len(lines)-2])
+	if strings.TrimSpace(dots) != "•••" {
+		t.Errorf("dots line = %q, want three dots", dots)
+	}
+	if !strings.Contains(lines[len(lines)-2], styleDim.Render("•")) {
+		t.Errorf("inactive pages should be dim")
+	}
+}
+
+func TestOnePageHasNoDots(t *testing.T) {
+	m := start(t, &fake{open: tasks()})
+	if m.pages() != 1 || m.listRows() != 16 || strings.Contains(m.View(), "•") {
+		t.Errorf("one page needs no dots and loses no row: rows=%d", m.listRows())
+	}
+	m = drive(t, m, key("l"), key("h"))
+	if m.cursor != 0 || m.mode != modeList {
+		t.Errorf("paging keys on one page must do nothing")
+	}
+}
+
+func TestManyPagesShowANumber(t *testing.T) {
+	m := start(t, &fake{open: manyTasks(400)})
+	m = drive(t, m, tea.WindowSizeMsg{Width: 20, Height: 10}, key("l"))
+	lines := strings.Split(m.View(), "\n")
+	if got := strings.TrimSpace(stripSGR(lines[len(lines)-2])); got != fmt.Sprintf("2/%d", m.pages()) {
+		t.Errorf("pagination = %q, want 2/%d", got, m.pages())
+	}
+}
+
+func TestEnterOpensAndLDoesNot(t *testing.T) {
+	m := start(t, &fake{open: tasks()})
+	if drive(t, m, key("l")).mode != modeList {
+		t.Errorf("l turns the page now; it must not open the task")
+	}
+	if drive(t, m, key("enter")).mode != modeDetail {
+		t.Errorf("enter should open the task")
+	}
+}
+
+func TestFilterReturnsToTheFirstPage(t *testing.T) {
+	m := start(t, &fake{open: manyTasks(40)})
+	m = drive(t, m, key("l"), key("l"), key("/"))
+	m = drive(t, m, typed("task 3")...)
+	if m.offset != 0 || m.cursor != 0 {
+		t.Errorf("filtering should start at the first page: cursor=%d offset=%d", m.cursor, m.offset)
+	}
+}

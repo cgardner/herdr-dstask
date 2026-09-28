@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/bubbles/paginator"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/naggie/dstask"
@@ -74,8 +75,30 @@ func (m Model) viewList() string {
 	for i := end - m.offset; i < rows; i++ {
 		b.WriteByte('\n')
 	}
+	if m.pages() > 1 {
+		b.WriteString(m.pagination())
+		b.WriteByte('\n')
+	}
 	b.WriteString(m.footer())
 	return b.String()
+}
+
+// pagination draws the page dots under the list, as the Bubbles list does.
+// The active dot has the normal text color and the others are dim, so both
+// follow the terminal theme. When the dots do not fit, it shows "2/5".
+func (m Model) pagination() string {
+	p := paginator.New()
+	p.Type = paginator.Dots // New starts in the "2/5" mode
+	p.PerPage = m.listRows()
+	p.SetTotalPages(len(m.visible))
+	p.Page = m.page()
+	p.ActiveDot = styleTitle.Render("•")
+	p.InactiveDot = styleDim.Render("•")
+	if 2+p.TotalPages > m.width {
+		p.Type = paginator.Arabic
+		p.ArabicFormat = "%d/%d"
+	}
+	return fit("  "+p.View(), m.width)
 }
 
 func (m Model) header() string {
@@ -373,7 +396,9 @@ func (m Model) viewHelp() string {
 		{"j k ↑ ↓", "move"},
 		{"g G", "first, last"},
 		{"ctrl+d ctrl+u", "half a page down, up"},
-		{"enter l", "view the task"},
+		{"→ l pgdn", "next page"},
+		{"← h pgup", "previous page"},
+		{"enter", "view the task"},
 		{"esc h", "back; in the list, clear a filter or quit"},
 		{"/", "filter by words in summary, project, tags, notes"},
 		{"#", "find by id: #72, or #72 #29 for several"},

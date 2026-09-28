@@ -48,6 +48,7 @@ description = "dstask tasks (sandbox copy)"
 | key | action |
 |---|---|
 | `j` `k` `g` `G` `ctrl+d` `ctrl+u` | move |
+| `→` `l` `pgdn` / `←` `h` `pgup` | next / previous page. Dots under the list show the pages |
 | `enter` | view the task: all fields and the notes |
 | `/` | filter by words in the summary, project, tags or notes. `#72` in the filter matches task 72, and `#72 #29` matches either. A bare number is a text search |
 | `#` | find by ID: opens the filter with `#` typed |
