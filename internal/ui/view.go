@@ -412,6 +412,7 @@ func (m Model) viewHelp() string {
 		{"", ""},
 		{"projects", ""},
 		{"enter", "show the open tasks of the project"},
+		{"s S", "sort by urgency, progress, open or last done"},
 		{"tab", "show or hide finished projects"},
 		{"p esc", "back to the tasks"},
 	}

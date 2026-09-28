@@ -93,6 +93,7 @@ type Model struct {
 	projects        []store.Project
 	showFinished    bool
 	projectsLoading bool
+	psort           projectSort
 	pcursor         int
 	poffset         int
 

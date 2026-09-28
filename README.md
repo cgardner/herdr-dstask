@@ -75,9 +75,20 @@ done, the done and total counts, and its highest open priority with the
 number of open tasks. Then it shows how many tasks are active (`▶`), paused
 (`‖`) and late, and when a task of the project was last finished.
 
-The most urgent projects come first: by their highest open priority, then by
-name. Finished projects, with no open tasks, are hidden, and the header says
-how many. `tab` shows them at the end, the most recently finished first.
+`s` and `S` change the order, and the header names it. A `▾` marks the sorted
+column:
+
+| order | first |
+|---|---|
+| urgency (the default) | the highest open priority, then by name |
+| progress | the largest part done |
+| open | the most open tasks |
+| last done | the most recently finished task |
+
+A new order starts again at the first project. Finished projects, with no
+open tasks, are hidden, and the header says how many. `tab` shows them. In
+every order they come last, the most recently finished first, so they do not
+push the unfinished projects down.
 
 `enter` returns to the task list with the filter `project:name`, so the list
 shows only that project's open tasks. `esc` clears the filter.
@@ -135,8 +146,9 @@ In the task view, `j` `k` `g` `G` `ctrl+d` `ctrl+u` scroll the notes, `r`
 reloads, and `esc` `h` `←` go back to the list.
 
 In the project view, the movement and page keys are the same as in the list.
-`enter` shows the project's tasks, `tab` shows or hides finished projects,
-`r` reloads, and `p` or `esc` goes back to the list.
+`enter` shows the project's tasks, `s` and `S` change the order, `tab` shows
+or hides finished projects, `r` reloads, and `p` or `esc` goes back to the
+list.
 
 ## Environment
 

@@ -17,6 +17,45 @@ import (
 // barWidth is the number of cells in a progress bar.
 const barWidth = 20
 
+// projectSort is an order for the project view. s and S cycle through them.
+type projectSort int
+
+const (
+	sortUrgency  projectSort = iota // highest open priority first
+	sortProgress                    // most done first
+	sortOpen                        // most open tasks first
+	sortLastDone                    // most recently finished task first
+	projectSorts                    // the number of orders
+)
+
+var projectSortNames = [projectSorts]string{"urgency", "progress", "open", "last done"}
+
+func (s projectSort) String() string { return projectSortNames[s] }
+
+// less orders two open projects. Every order falls back to the name, so the
+// result never depends on the order the library returned.
+func (s projectSort) less(a, b store.Project) bool {
+	switch s {
+	case sortProgress:
+		if a.Done() != b.Done() {
+			return a.Done() > b.Done()
+		}
+	case sortOpen:
+		if a.OpenTasks() != b.OpenTasks() {
+			return a.OpenTasks() > b.OpenTasks()
+		}
+	case sortLastDone:
+		if !a.Resolved.Equal(b.Resolved) {
+			return a.Resolved.After(b.Resolved) // never finished sorts last
+		}
+	default:
+		if a.Priority != b.Priority {
+			return a.Priority < b.Priority
+		}
+	}
+	return a.Name < b.Name
+}
+
 // projectsMsg carries a fresh project list.
 type projectsMsg struct {
 	projects []store.Project
@@ -41,9 +80,10 @@ func (m Model) openProjects() (tea.Model, tea.Cmd) {
 
 // setProjects sorts the projects and keeps the cursor on the same project.
 //
-// Projects with open tasks come first, most urgent first: by their highest
-// open priority, then by name. Finished projects follow, most recently
-// finished first, and only when the view shows them.
+// Projects with open tasks come first, in the chosen order. Finished projects
+// always follow, most recently finished first, and only when the view shows
+// them. Under the progress order they would otherwise fill the top rows at
+// 100%, above the projects that still need work.
 func (m *Model) setProjects(all []store.Project) {
 	keep := ""
 	if p, ok := m.selectedProject(); ok {
@@ -64,10 +104,7 @@ func (m *Model) setProjects(all []store.Project) {
 		if a.OpenTasks() == 0 {
 			return a.Resolved.After(b.Resolved)
 		}
-		if a.Priority != b.Priority {
-			return a.Priority < b.Priority
-		}
-		return a.Name < b.Name
+		return m.psort.less(a, b)
 	})
 	m.pcursor = 0
 	for i, p := range m.projects {
@@ -147,6 +184,19 @@ func (m Model) updateProjects(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.showFinished = !m.showFinished
 		m.setProjects(m.allProjects)
 		return m, nil
+	case "s", "S":
+		step := projectSort(1)
+		if msg.String() == "S" {
+			step = projectSorts - 1
+		}
+		m.psort = (m.psort + step) % projectSorts
+		// A new order is a request to see a different top of the list, so
+		// the view returns to the first project, as the switcher does.
+		m.pcursor = 0
+		m.setProjects(m.allProjects)
+		m.pcursor = 0
+		m.clampProjects()
+		return m, nil
 	case "r":
 		m.projectsLoading = true
 		return m, m.loadProjects()
@@ -190,7 +240,7 @@ func (m Model) viewProjects() string {
 	b.WriteByte('\n')
 
 	cols := m.projectColumns()
-	b.WriteString(styleDim.Render(fit(cols.header(), m.width)))
+	b.WriteString(styleDim.Render(fit(cols.header(m.psort), m.width)))
 	b.WriteByte('\n')
 
 	rows := m.projectRows()
@@ -227,6 +277,7 @@ func (m Model) projectsHeader() string {
 	if n := m.finishedProjects(); n > 0 && !m.showFinished {
 		parts = append(parts, styleDim.Render(fmt.Sprintf("%d finished hidden", n)))
 	}
+	parts = append(parts, "sort "+styleKey.Render(m.psort.String()))
 	if m.projectsLoading {
 		parts = append(parts, styleDim.Render("…"))
 	}
@@ -244,7 +295,7 @@ func (m Model) projectsFooter() string {
 	if m.showFinished {
 		finished = "hide finished"
 	}
-	return hints(m.width, "enter", "show tasks", "tab", finished, "p", "back", "r", "reload", "?", "help")
+	return hints(m.width, "enter", "show tasks", "s", "sort", "tab", finished, "p", "back", "r", "reload", "?", "help")
 }
 
 // projectCols are the widths of the columns that vary, measured over every
@@ -255,14 +306,23 @@ type projectCols struct {
 }
 
 // header lines the column titles up with the cells that projectRow draws.
-func (c projectCols) header() string {
-	h := fmt.Sprintf("  %-*s %-*s %4s %7s  %-*s", c.name, "PROJECT", barWidth, "PROGRESS", "", "DONE", 2+c.open, "OPEN")
+// A ▾ marks the column the view is sorted by. The urgency order has no
+// column of its own, and the header names it instead.
+func (c projectCols) header(s projectSort) string {
+	mark := func(title string, by projectSort) string {
+		if s == by {
+			return title + " ▾"
+		}
+		return title
+	}
+	h := fmt.Sprintf("  %-*s %-*s %4s %7s  %-*s", c.name, "PROJECT", barWidth, mark("PROGRESS", sortProgress),
+		"", "DONE", 2+c.open, mark("OPEN", sortOpen))
 	for _, w := range []int{c.active, c.paused, c.late} {
 		if w > 0 {
 			h += strings.Repeat(" ", 2+w)
 		}
 	}
-	return h + "  LAST DONE"
+	return h + "  " + mark("LAST DONE", sortLastDone)
 }
 
 func (m Model) projectColumns() projectCols {
