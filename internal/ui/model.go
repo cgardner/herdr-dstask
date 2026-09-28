@@ -17,6 +17,8 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/naggie/dstask"
+
+	"github.com/cgardner/herdr-dstask/internal/store"
 )
 
 // Backend is the part of the task store the UI uses. store.Store satisfies
@@ -36,6 +38,7 @@ type Backend interface {
 	Undo() error
 	EditTask(id int) (Editor, error)
 	EditNotes(id int) (Editor, error)
+	Projects() ([]store.Project, error)
 }
 
 // Editor is a task open in a temporary file. The UI hands Command to the
@@ -54,6 +57,7 @@ const (
 	modePrompt
 	modeConfirm
 	modeHelp
+	modeProjects
 )
 
 type promptKind int
@@ -83,6 +87,15 @@ type Model struct {
 
 	cursor int
 	offset int
+
+	// The project view has its own list, cursor and page.
+	allProjects     []store.Project
+	projects        []store.Project
+	showFinished    bool
+	projectsLoading bool
+	pcursor         int
+	poffset         int
+
 	width  int
 	height int
 
@@ -163,6 +176,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.refreshDetail()
 		}
 		m.clamp()
+		m.clampProjects()
+		return m, nil
+
+	case projectsMsg:
+		m.projectsLoading = false
+		if msg.err != nil {
+			m.setErr(msg.err)
+			return m, nil
+		}
+		m.setProjects(msg.projects)
 		return m, nil
 
 	case loadedMsg:
@@ -197,6 +220,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		case modeDetail:
 			return m.updateDetail(msg)
+		case modeProjects:
+			return m.updateProjects(msg)
 		default:
 			return m.updateList(msg)
 		}
@@ -246,6 +271,7 @@ func (m *Model) applyFilter() {
 // matches reports whether every word of the filter occurs in the summary,
 // project, tags, notes, priority or status, ignoring case.
 //
+// A word such as "project:atlas" matches that project exactly, ignoring case.
 // A word such as "#72" matches the task ID exactly. Several ID words match any
 // of those tasks, and the text words then narrow the result. A bare number
 // stays a text search, so a ticket number such as "3995" in a summary can
@@ -262,6 +288,12 @@ func matches(t dstask.Task, filter string) bool {
 		}
 		if id, ok := idWord(word); ok {
 			ids = append(ids, id)
+			continue
+		}
+		if name, ok := projectWord(word); ok {
+			if !strings.EqualFold(t.Project, name) {
+				return false
+			}
 			continue
 		}
 		if !strings.Contains(hay, strings.TrimPrefix(word, "+")) {
@@ -409,6 +441,8 @@ func (m Model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "?":
 		m.back, m.mode = modeList, modeHelp
 		return m, nil
+	case "p":
+		return m.openProjects()
 	default:
 		return m.taskKey(msg)
 	}

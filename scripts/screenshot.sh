@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Make the README screenshots, docs/images/screenshot.png for the list and
-# docs/images/detail.png for a task, and docs/images/social-preview.png.
+# Make the README screenshots, docs/images/screenshot.png for the list,
+# docs/images/detail.png for a task and docs/images/projects.png for the
+# project view, and docs/images/social-preview.png.
 #
 # It must run inside Herdr, because Herdr is the terminal emulator: it runs
 # `make demo` in a pane of a fixed width, reads the finished screen back with
@@ -15,7 +16,7 @@ cd "$(dirname "$0")/.."
 command -v rsvg-convert >/dev/null || { echo "screenshot: rsvg-convert is needed" >&2; exit 1; }
 make build >/dev/null
 
-WIDTH=115 # wide enough for every key hint in the footer
+WIDTH=124 # the list footer is 120 columns; this leaves a margin
 work="$(mktemp -d)"
 json() { python3 -c "import json,sys; print(json.load(sys.stdin)$1)"; }
 
@@ -46,10 +47,20 @@ herdr pane wait-output "$pane" --match "remove the old client library" --timeout
 sleep 0.5
 herdr pane read "$pane" --source visible --format ansi >"$work/detail.ansi"
 
+herdr pane send-keys "$pane" esc >/dev/null # back to the list
+sleep 0.3
+herdr pane send-text "$pane" p >/dev/null # the project view
+herdr pane wait-output "$pane" --match "LAST DONE" --timeout 10000 >/dev/null
+herdr pane send-keys "$pane" tab >/dev/null # show the finished project too
+herdr pane wait-output "$pane" --match "onboarding" --timeout 10000 >/dev/null
+sleep 0.5
+herdr pane read "$pane" --source visible --format ansi >"$work/projects.ansi"
+
 python3 scripts/screenshot.py "$work/list.ansi" "$work" screenshot --social --cols "$WIDTH"
 python3 scripts/screenshot.py "$work/detail.ansi" "$work" detail --cols "$WIDTH"
+python3 scripts/screenshot.py "$work/projects.ansi" "$work" projects --cols "$WIDTH"
 mkdir -p docs/images
-for name in screenshot detail social-preview; do
+for name in screenshot detail projects social-preview; do
   rsvg-convert -z 2 "$work/$name.svg" -o "docs/images/$name.png"
   echo "wrote docs/images/$name.png"
 done

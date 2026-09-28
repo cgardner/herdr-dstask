@@ -5,7 +5,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/bubbles/paginator"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/naggie/dstask"
@@ -28,6 +27,7 @@ var (
 	styleError    = lipgloss.NewStyle().Foreground(lipgloss.Color("1"))
 	styleOK       = lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
 	styleKey      = lipgloss.NewStyle().Foreground(lipgloss.Color("6")).Bold(true)
+	styleBarDone  = lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
 )
 
 // View renders the current mode.
@@ -37,6 +37,8 @@ func (m Model) View() string {
 		return m.viewHelp()
 	case modeDetail:
 		return m.viewDetail()
+	case modeProjects:
+		return m.viewProjects()
 	case modePrompt, modeConfirm:
 		if m.back == modeDetail {
 			return m.viewDetail()
@@ -87,18 +89,7 @@ func (m Model) viewList() string {
 // The active dot has the normal text color and the others are dim, so both
 // follow the terminal theme. When the dots do not fit, it shows "2/5".
 func (m Model) pagination() string {
-	p := paginator.New()
-	p.Type = paginator.Dots // New starts in the "2/5" mode
-	p.PerPage = m.listRows()
-	p.SetTotalPages(len(m.visible))
-	p.Page = m.page()
-	p.ActiveDot = styleTitle.Render("•")
-	p.InactiveDot = styleDim.Render("•")
-	if 2+p.TotalPages > m.width {
-		p.Type = paginator.Arabic
-		p.ArabicFormat = "%d/%d"
-	}
-	return fit("  "+p.View(), m.width)
+	return m.dots(len(m.visible), m.listRows(), m.page())
 }
 
 func (m Model) header() string {
@@ -301,7 +292,7 @@ func (m Model) footer() string {
 	if m.mode == modeDetail {
 		return hints(m.width, "esc", "back", "s", "start/stop", "d", "done", "m", "modify", "n", "note", "N", "edit notes", "e", "edit", "x", "remove", "?", "help")
 	}
-	return hints(m.width, "enter", "view", "/", "filter", "A", "active", "a", "add", "s", "start/stop", "d", "done", "m", "modify", "n", "note", "e", "edit", "tab", "resolved", "?", "help")
+	return hints(m.width, "enter", "view", "/", "filter", "p", "projects", "A", "active", "a", "add", "s", "start/stop", "d", "done", "m", "modify", "n", "note", "e", "edit", "tab", "resolved", "?", "help")
 }
 
 func (m Model) promptLine() string {
@@ -400,11 +391,12 @@ func (m Model) viewHelp() string {
 		{"← h pgup", "previous page"},
 		{"enter", "view the task"},
 		{"esc h", "back; in the list, clear a filter or quit"},
-		{"/", "filter by words in summary, project, tags, notes"},
+		{"/", "filter by words, or project:name for one project"},
 		{"#", "find by id: #72, or #72 #29 for several"},
 		{"A", "show only active tasks, or all tasks again"},
 		{"tab", "switch between open and resolved tasks"},
 		{"c", "switch between the dstask context and every task"},
+		{"p", "projects: progress of each project"},
 		{"r", "reload"},
 		{"", ""},
 		{"a", "add a task (dstask syntax: +tag project:x P1 summary)"},
@@ -417,12 +409,21 @@ func (m Model) viewHelp() string {
 		{"x", "remove, after a confirmation"},
 		{"u", "undo the last change (git revert)"},
 		{"q", "quit"},
+		{"", ""},
+		{"projects", ""},
+		{"enter", "show the open tasks of the project"},
+		{"tab", "show or hide finished projects"},
+		{"p esc", "back to the tasks"},
 	}
 	var b strings.Builder
 	b.WriteString(styleTitle.Render(" dstask keys") + "\n\n")
 	for _, k := range keys {
 		if k[0] == "" {
 			b.WriteByte('\n')
+			continue
+		}
+		if k[1] == "" { // a section title
+			b.WriteString(" " + styleTitle.Render(k[0]) + "\n")
 			continue
 		}
 		b.WriteString(fmt.Sprintf("  %s %s\n", styleKey.Render(fmt.Sprintf("%-14s", k[0])), k[1]))

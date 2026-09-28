@@ -64,6 +64,29 @@ match Herdr only when your terminal and Herdr use the same theme. The
 selected row uses `selection_bg` from your Herdr config, as Herdr's own menus
 do. `HERDR_DSTASK_SELECTION_BG` overrides it with a hex color.
 
+## Projects
+
+`p` opens the project view, which shows how far along each project is.
+
+![The project view, showing invented projects](docs/images/projects.png)
+
+Each row shows the project, a progress bar, the percent of its tasks that are
+done, the done and total counts, and its highest open priority with the
+number of open tasks. Then it shows how many tasks are active (`▶`), paused
+(`‖`) and late, and when a task of the project was last finished.
+
+The most urgent projects come first: by their highest open priority, then by
+name. Finished projects, with no open tasks, are hidden, and the header says
+how many. `tab` shows them at the end, the most recently finished first.
+
+`enter` returns to the task list with the filter `project:name`, so the list
+shows only that project's open tasks. `esc` clears the filter.
+
+The counts are the ones that `dstask show-projects` gives, from the same
+library call. Like that command, the view ignores the context, because a
+project's progress needs all of its tasks. The view loads the resolved tasks
+too, so it opens a little slower than the list: about 200 ms for 750 tasks.
+
 ## Keys
 
 In the list:
@@ -81,12 +104,15 @@ In the list:
 | `A` | show only active tasks; press again to show all |
 | `tab` | switch between open and resolved tasks |
 | `c` | switch between the dstask context and all tasks |
+| `p` | open the project view |
 | `r` | reload |
 | `?` | help |
 | `esc` | clear the text filter, then the active filter, then quit |
 | `q` | quit |
 
-In the filter, `#72` matches task 72, and `#72 #29` matches either task.
+In the filter, `project:atlas` matches the tasks of that project, and
+`project:` alone matches the tasks without one. `#72` matches task 72, and
+`#72 #29` matches either task.
 Other words then narrow the result. A number without `#` is a text search, so
 a ticket number such as `3995` in a summary can still be found. `A` and `/`
 work together.
@@ -107,6 +133,10 @@ These change a task, in the list and in the task view:
 
 In the task view, `j` `k` `g` `G` `ctrl+d` `ctrl+u` scroll the notes, `r`
 reloads, and `esc` `h` `←` go back to the list.
+
+In the project view, the movement and page keys are the same as in the list.
+`enter` shows the project's tasks, `tab` shows or hides finished projects,
+`r` reloads, and `p` or `esc` goes back to the list.
 
 ## Environment
 
@@ -138,7 +168,9 @@ tasks again.
 - The plugin does not sync. `dstask sync` is still necessary to push and pull.
 - dstask gives a resolved task no ID, so the plugin cannot change one. `u`
   can bring back a task that you resolved by mistake.
-- Templates are not supported yet.
+- Templates are not supported yet. The project view counts a template or a
+  recurring task in a project as an open task, as `dstask show-projects`
+  does.
 - The dstask library calls `os.Exit` when it cannot write a task file. If that
   occurs, the popup closes, and the terminal can stay in the alternate screen.
   `reset` repairs it.

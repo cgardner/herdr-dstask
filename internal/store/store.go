@@ -127,6 +127,64 @@ func (s *Store) Resolved() ([]dstask.Task, error) {
 	return tasks, err
 }
 
+// Project is one project's progress. The counts come from dstask's own
+// TaskSet.GetProjects, the same numbers that `dstask show-projects` prints,
+// plus three that it does not give.
+type Project struct {
+	dstask.Project
+
+	// ActiveTasks, PausedTasks and OverdueTasks count open tasks only.
+	ActiveTasks, PausedTasks, OverdueTasks int
+}
+
+// OpenTasks is the number of tasks not yet resolved.
+func (p Project) OpenTasks() int { return p.Tasks - p.TasksResolved }
+
+// Done is the fraction of tasks resolved, from 0 to 1.
+func (p Project) Done() float64 {
+	if p.Tasks == 0 {
+		return 0
+	}
+	return float64(p.TasksResolved) / float64(p.Tasks)
+}
+
+// Projects lists every project with its progress. It loads resolved tasks,
+// which the task listings do not, so it is slower: about 200 ms for 750
+// tasks. Like `dstask show-projects`, it ignores the context, because a
+// project's progress needs all of its tasks.
+func (s *Store) Projects() ([]Project, error) {
+	var out []Project
+	now := time.Now()
+	err := quiet(func() error {
+		ts, err := dstask.LoadTaskSet(s.conf.Repo, s.conf.IDsFile, true)
+		if err != nil {
+			return err
+		}
+		index := map[string]int{}
+		for _, p := range ts.GetProjects() {
+			index[p.Name] = len(out)
+			out = append(out, Project{Project: *p})
+		}
+		for _, t := range ts.AllTasks() {
+			i, ok := index[t.Project]
+			if !ok || t.Status == dstask.STATUS_RESOLVED {
+				continue
+			}
+			switch t.Status {
+			case dstask.STATUS_ACTIVE:
+				out[i].ActiveTasks++
+			case dstask.STATUS_PAUSED:
+				out[i].PausedTasks++
+			}
+			if !t.Due.IsZero() && t.Due.Before(now) {
+				out[i].OverdueTasks++
+			}
+		}
+		return nil
+	})
+	return out, err
+}
+
 // Done resolves a task.
 func (s *Store) Done(id int) error {
 	return s.change(id, "Resolved %s", func(t *dstask.Task) error {

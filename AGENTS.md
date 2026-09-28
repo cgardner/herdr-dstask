@@ -118,7 +118,7 @@ employer, colleagues, customers and private work, and this repository is
 public. Take new fixture tasks from the invented projects that
 `tools/demofixture` already uses.
 
-`make screenshot` runs the demo in a Herdr pane of 115 columns, reads the
+`make screenshot` runs the demo in a Herdr pane of 124 columns, reads the
 screen back with `herdr pane read --format ansi`, and `scripts/screenshot.py`
 paints it with the Catppuccin Mocha palette. Two traps cost time here:
 
@@ -130,3 +130,21 @@ paints it with the Catppuccin Mocha palette. Two traps cost time here:
 
 GitHub has no API for the social preview, so `docs/images/social-preview.png`
 is uploaded by hand, under Settings, General, Social preview.
+
+## The project view
+
+`Store.Projects` starts from `TaskSet.GetProjects`, so its counts agree with
+`dstask show-projects`. It adds only the active, paused and late counts,
+which the library does not give. Keep the library as the source of the done
+and total counts.
+
+- `GetProjects` counts every loaded task, templates and recurring tasks too,
+  so such a task in a project counts as open forever. That is the library's
+  behavior, and the README says so.
+- `GetProjects` ignores any filter on the task set, so the view ignores the
+  context, as `show-projects` does. `enter` on a project whose open tasks the
+  context hides says so in the status line.
+- The view loads resolved tasks, so it is the one slow load: about 200 ms for
+  750 tasks. It loads each time the view opens, never at startup.
+- The task list's project filter is the `project:name` word in the ordinary
+  text filter, so there is one filter, not two.

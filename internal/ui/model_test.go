@@ -10,6 +10,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/naggie/dstask"
+
+	"github.com/cgardner/herdr-dstask/internal/store"
 )
 
 // fake records every change the UI asks for.
@@ -19,6 +21,8 @@ type fake struct {
 	ignore         bool
 	fail           error
 	ed             *fakeEditor
+	projects       []store.Project
+	projectsErr    error
 }
 
 func (f *fake) Open() ([]dstask.Task, error)     { return f.open, nil }
@@ -92,7 +96,7 @@ func settle(t *testing.T, m Model, cmd tea.Cmd, depth int) Model {
 		return m
 	}
 	switch msg.(type) {
-	case loadedMsg, actionMsg:
+	case loadedMsg, actionMsg, projectsMsg:
 		next, more := m.Update(msg)
 		return settle(t, next.(Model), more, depth+1)
 	}
@@ -422,3 +426,5 @@ func TestHashKeyOpensTheIDSearch(t *testing.T) {
 		t.Errorf("the found task should be selected, got #%d", got.ID)
 	}
 }
+
+func (f *fake) Projects() ([]store.Project, error) { return f.projects, f.projectsErr }

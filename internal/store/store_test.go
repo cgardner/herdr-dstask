@@ -418,3 +418,48 @@ func TestEditRefusesWhenTheIDMovedToAnotherTask(t *testing.T) {
 		t.Errorf("the other task was overwritten: %+v", open[0])
 	}
 }
+
+func TestProjectsCountProgress(t *testing.T) {
+	s := repo(t)
+	for _, in := range []string{
+		"project:alpha first",
+		"project:alpha second",
+		"project:alpha P1 due:yesterday third",
+		"project:alpha fourth",
+		"project:beta only",
+		"no project at all",
+	} {
+		mustAdd(t, s, in)
+	}
+	// alpha: #1 done, #2 active, #3 overdue, #4 paused.
+	for _, step := range []func() error{
+		func() error { return s.Done(1) },
+		func() error { return s.Start(2) },
+		func() error { return s.Start(4) },
+		func() error { return s.Stop(4) },
+	} {
+		if err := step(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	projects, err := s.Projects()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(projects) != 2 || projects[0].Name != "alpha" || projects[1].Name != "beta" {
+		t.Fatalf("projects = %+v; a task with no project must not make one", projects)
+	}
+	a := projects[0]
+	if a.Tasks != 4 || a.TasksResolved != 1 || a.OpenTasks() != 3 || a.Done() != 0.25 {
+		t.Errorf("alpha counts wrong: %+v", a)
+	}
+	if a.ActiveTasks != 1 || a.PausedTasks != 1 || a.OverdueTasks != 1 {
+		t.Errorf("alpha extras wrong: active=%d paused=%d overdue=%d", a.ActiveTasks, a.PausedTasks, a.OverdueTasks)
+	}
+	if !a.Active || a.Priority != "P1" || a.Resolved.IsZero() {
+		t.Errorf("library fields wrong: active=%v priority=%s resolved=%v", a.Active, a.Priority, a.Resolved)
+	}
+	if (Project{}).Done() != 0 {
+		t.Errorf("a project with no tasks is 0%% done")
+	}
+}
