@@ -148,3 +148,6 @@ and total counts.
   750 tasks. It loads each time the view opens, never at startup.
 - The task list's project filter is the `project:name` word in the ordinary
   text filter, so there is one filter, not two.
+- The project view's own name filter, `pfilter`, is a different thing: it
+  narrows the projects, not the tasks. It has its own prompt kind,
+  `promptProjectFilter`, so its text can never land in the task filter.

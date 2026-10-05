@@ -43,6 +43,9 @@ func (m Model) View() string {
 		if m.back == modeDetail {
 			return m.viewDetail()
 		}
+		if m.back == modeProjects {
+			return m.viewProjects()
+		}
 	}
 	return m.viewList()
 }
@@ -301,6 +304,8 @@ func (m Model) promptLine() string {
 		promptModify: fmt.Sprintf("modify #%d", m.target.ID),
 		promptNote:   fmt.Sprintf("note #%d", m.target.ID),
 		promptAdd:    "add",
+
+		promptProjectFilter: "filter projects",
 	}[m.prompt]
 	return fit(" "+styleKey.Render(label)+" "+m.input.View(), m.width)
 }
@@ -412,6 +417,7 @@ func (m Model) viewHelp() string {
 		{"", ""},
 		{"projects", ""},
 		{"enter", "show the open tasks of the project"},
+		{"/", "filter projects by words in the name"},
 		{"s S", "sort by urgency, progress, open or last done"},
 		{"tab", "show or hide finished projects"},
 		{"p esc", "back to the tasks"},

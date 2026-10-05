@@ -92,7 +92,7 @@ func (m *Model) setProjects(all []store.Project) {
 	m.allProjects = all
 	m.projects = m.projects[:0:0]
 	for _, p := range all {
-		if p.OpenTasks() > 0 || m.showFinished {
+		if (p.OpenTasks() > 0 || m.showFinished) && projectMatches(p.Name, m.pfilter) {
 			m.projects = append(m.projects, p)
 		}
 	}
@@ -115,14 +115,49 @@ func (m *Model) setProjects(all []store.Project) {
 	m.clampProjects()
 }
 
+// projectMatches reports whether every word of the filter occurs in the
+// project name, ignoring case. An empty filter matches every project.
+func projectMatches(name, filter string) bool {
+	name = strings.ToLower(name)
+	for _, word := range strings.Fields(strings.ToLower(filter)) {
+		if !strings.Contains(name, word) {
+			return false
+		}
+	}
+	return true
+}
+
+// finishedProjects counts the finished projects that the filter matches, so
+// the "hidden" count in the header says what tab would add.
 func (m Model) finishedProjects() int {
 	n := 0
 	for _, p := range m.allProjects {
-		if p.OpenTasks() == 0 {
+		if p.OpenTasks() == 0 && projectMatches(p.Name, m.pfilter) {
 			n++
 		}
 	}
 	return n
+}
+
+// shownProjects is the number of projects the view would show with no name
+// filter, for the "3 of 45" count in the header.
+func (m Model) shownProjects() int {
+	n := 0
+	for _, p := range m.allProjects {
+		if p.OpenTasks() > 0 || m.showFinished {
+			n++
+		}
+	}
+	return n
+}
+
+// setProjectFilter applies a name filter and returns to the first project,
+// as the task filter does.
+func (m *Model) setProjectFilter(filter string) {
+	m.pfilter = strings.TrimSpace(filter)
+	m.setProjects(m.allProjects)
+	m.pcursor = 0
+	m.clampProjects()
 }
 
 func (m Model) selectedProject() (store.Project, bool) {
@@ -157,9 +192,19 @@ func (m Model) updateProjects(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "q", "ctrl+c":
 		return m, tea.Quit
-	case "esc", "p", "backspace":
+	case "esc":
+		// esc clears the name filter first, then leaves the view.
+		if m.pfilter != "" {
+			m.setProjectFilter("")
+			return m, nil
+		}
 		m.mode = modeList
 		return m, nil
+	case "p", "backspace":
+		m.mode = modeList
+		return m, nil
+	case "/":
+		return m.openPrompt(promptProjectFilter, m.pfilter)
 	case "j", "down":
 		m.pcursor++
 	case "k", "up":
@@ -251,6 +296,11 @@ func (m Model) viewProjects() string {
 			msg = "loading…"
 		case len(m.allProjects) == 0:
 			msg = "no projects: give a task one with project:name"
+		case m.pfilter != "":
+			msg = fmt.Sprintf("no project matches %q", m.pfilter)
+			if !m.showFinished && m.finishedProjects() > 0 {
+				msg += " among the open ones (tab shows finished ones)"
+			}
 		}
 		b.WriteString(styleDim.Render("  " + msg))
 		b.WriteByte('\n')
@@ -273,11 +323,18 @@ func (m Model) viewProjects() string {
 }
 
 func (m Model) projectsHeader() string {
-	parts := []string{styleTitle.Render("dstask"), fmt.Sprintf("projects %d", len(m.projects))}
+	count := fmt.Sprintf("projects %d", len(m.projects))
+	if m.pfilter != "" {
+		count = fmt.Sprintf("projects %d of %d", len(m.projects), m.shownProjects())
+	}
+	parts := []string{styleTitle.Render("dstask"), count}
 	if n := m.finishedProjects(); n > 0 && !m.showFinished {
 		parts = append(parts, styleDim.Render(fmt.Sprintf("%d finished hidden", n)))
 	}
 	parts = append(parts, "sort "+styleKey.Render(m.psort.String()))
+	if m.pfilter != "" {
+		parts = append(parts, "filter "+styleTag.Render(m.pfilter))
+	}
 	if m.projectsLoading {
 		parts = append(parts, styleDim.Render("…"))
 	}
@@ -285,6 +342,9 @@ func (m Model) projectsHeader() string {
 }
 
 func (m Model) projectsFooter() string {
+	if m.mode == modePrompt {
+		return m.promptLine()
+	}
 	if m.status != "" {
 		if m.statusErr {
 			return styleError.Render(fit(" "+m.status, m.width))
@@ -295,7 +355,7 @@ func (m Model) projectsFooter() string {
 	if m.showFinished {
 		finished = "hide finished"
 	}
-	return hints(m.width, "enter", "show tasks", "s", "sort", "tab", finished, "p", "back", "r", "reload", "?", "help")
+	return hints(m.width, "enter", "show tasks", "/", "filter", "s", "sort", "tab", finished, "p", "back", "r", "reload", "?", "help")
 }
 
 // projectCols are the widths of the columns that vary, measured over every

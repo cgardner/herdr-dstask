@@ -325,3 +325,102 @@ func TestProjectSortReturnsToTheTop(t *testing.T) {
 		t.Errorf("sort = %s after leaving the view, want progress", m.psort)
 	}
 }
+
+func filterProjects() []store.Project {
+	return []store.Project{
+		project("ai-adoption", "P1", 4, 1),
+		project("ai-governance", "P2", 3, 1),
+		project("aws-infra", "P2", 2, 0),
+		project("meeting-ai", "P3", 5, 4),
+		project("ai-archive", "P2", 2, 2), // finished
+	}
+}
+
+func TestProjectFilterNarrowsAsYouType(t *testing.T) {
+	m := startProjects(t, &fake{open: tasks(), projects: filterProjects()})
+	m = drive(t, m, key("/"))
+	if m.mode != modePrompt || m.prompt != promptProjectFilter || !strings.Contains(m.View(), "filter projects") {
+		t.Fatalf("/ should open the project filter, mode=%v", m.mode)
+	}
+	m = drive(t, m, typed("ai")...)
+	if got := names(m.projects); got != "ai-adoption,ai-governance,meeting-ai" {
+		t.Errorf("ai: %s", got)
+	}
+	// The view stays behind the prompt while the user types.
+	if !strings.Contains(m.View(), "projects 3 of 4") {
+		t.Errorf("header should count the matches:\n%s", m.View())
+	}
+	m = drive(t, m, append(typed(" gov"), key("enter"))...)
+	if m.mode != modeProjects || m.pfilter != "ai gov" || names(m.projects) != "ai-governance" {
+		t.Fatalf("mode=%v filter=%q projects=%s", m.mode, m.pfilter, names(m.projects))
+	}
+	if !strings.Contains(m.View(), "filter ai gov") {
+		t.Errorf("header should show the filter")
+	}
+}
+
+func TestProjectFilterIgnoresCaseAndCountsHiddenFinished(t *testing.T) {
+	m := startProjects(t, &fake{open: tasks(), projects: filterProjects()})
+	m = drive(t, m, key("/"))
+	m = drive(t, m, append(typed("ARCHIVE"), key("enter"))...)
+	if len(m.projects) != 0 {
+		t.Fatalf("a finished project is hidden: %s", names(m.projects))
+	}
+	view := m.View()
+	if !strings.Contains(view, `no project matches "ARCHIVE" among the open ones`) || !strings.Contains(view, "1 finished hidden") {
+		t.Errorf("empty message or hidden count wrong:\n%s", view)
+	}
+	m = drive(t, m, key("tab"))
+	if names(m.projects) != "ai-archive" {
+		t.Errorf("tab should show the finished match, got %s", names(m.projects))
+	}
+	m = drive(t, m, key("/"))
+	m = drive(t, m, append(typed("x"), key("enter"))...)
+	if !strings.Contains(m.View(), `no project matches "ARCHIVEx"`) || strings.Contains(m.View(), "among the open ones") {
+		t.Errorf("with finished shown, the hint must not mention tab:\n%s", m.View())
+	}
+}
+
+func TestProjectFilterEscClearsThenLeaves(t *testing.T) {
+	m := startProjects(t, &fake{open: tasks(), projects: filterProjects()})
+	m = drive(t, m, key("/"))
+	m = drive(t, m, append(typed("aws"), key("enter"))...)
+	m = drive(t, m, key("esc"))
+	if m.mode != modeProjects || m.pfilter != "" || len(m.projects) != 4 {
+		t.Fatalf("first esc should clear the filter: mode=%v filter=%q", m.mode, m.pfilter)
+	}
+	if m = drive(t, m, key("esc")); m.mode != modeList {
+		t.Errorf("second esc should leave the view")
+	}
+}
+
+func TestProjectFilterIsSeparateFromTheTaskFilter(t *testing.T) {
+	m := startProjects(t, &fake{open: tasks(), projects: filterProjects()})
+	m = drive(t, m, key("/"))
+	m = drive(t, m, append(typed("ai"), key("enter"))...)
+	m = drive(t, m, key("p"))
+	if m.filter != "" || len(m.visible) != 3 {
+		t.Errorf("the project filter leaked into the task list: %q", m.filter)
+	}
+	// The project filter is still there when the view opens again.
+	m = drive(t, m, key("p"))
+	if m.pfilter != "ai" || len(m.projects) != 3 {
+		t.Errorf("pfilter=%q projects=%d", m.pfilter, len(m.projects))
+	}
+	// enter on a filtered project still filters the task list to it.
+	m = drive(t, m, key("enter"))
+	if m.filter != "project:ai-adoption" {
+		t.Errorf("filter = %q", m.filter)
+	}
+}
+
+func TestProjectFilterPromptEscKeepsWhatWasTyped(t *testing.T) {
+	m := startProjects(t, &fake{open: tasks(), projects: filterProjects()})
+	m = drive(t, m, key("/"))
+	m = drive(t, m, append(typed("meet"), key("esc"))...)
+	// As in the task list, the filter applies while typing, so esc in the
+	// prompt closes it with the filter in place, and a second esc clears it.
+	if m.mode != modeProjects || m.pfilter != "meet" {
+		t.Errorf("mode=%v filter=%q", m.mode, m.pfilter)
+	}
+}

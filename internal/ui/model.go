@@ -67,6 +67,7 @@ const (
 	promptModify
 	promptNote
 	promptAdd
+	promptProjectFilter
 )
 
 // Model is the whole UI state.
@@ -94,6 +95,7 @@ type Model struct {
 	showFinished    bool
 	projectsLoading bool
 	psort           projectSort
+	pfilter         string // words in the project name
 	pcursor         int
 	poffset         int
 
@@ -564,6 +566,8 @@ var placeholders = map[promptKind]string{
 	promptModify: "+tag -tag project:name P1 due:friday",
 	promptNote:   "text to append to the notes",
 	promptAdd:    "+tag project:name P1 summary of the task",
+
+	promptProjectFilter: "words in the project name",
 }
 
 func (m Model) updatePrompt(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -589,16 +593,22 @@ func (m Model) updatePrompt(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, act(fmt.Sprintf("noted #%d", id), func() error { return m.backend.Note(id, value) })
 		case promptAdd:
 			return m, act("added a task", func() error { return m.backend.Add(value) })
+		case promptProjectFilter:
+			m.setProjectFilter(value)
+			return m, nil
 		}
 		return m, nil
 	}
 	var cmd tea.Cmd
 	m.input, cmd = m.input.Update(msg)
-	if m.prompt == promptFilter {
-		// The filter narrows the list as the user types.
+	// A filter narrows its list as the user types.
+	switch m.prompt {
+	case promptFilter:
 		m.filter = strings.TrimSpace(m.input.Value())
 		m.cursor, m.offset = 0, 0
 		m.applyFilter()
+	case promptProjectFilter:
+		m.setProjectFilter(m.input.Value())
 	}
 	return m, cmd
 }

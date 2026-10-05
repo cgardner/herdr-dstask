@@ -90,6 +90,13 @@ open tasks, are hidden, and the header says how many. `tab` shows them. In
 every order they come last, the most recently finished first, so they do not
 push the unfinished projects down.
 
+`/` filters the projects by name as you type. Every word must occur in the
+name, and case does not matter, so `ai gov` finds `ai-governance`. The header
+shows the count, such as `projects 3 of 45`, and how many finished projects
+also match. `esc` clears the filter, and a second `esc` leaves the view. The
+project filter is separate from the task filter, and it stays when you leave
+the view and come back.
+
 `enter` returns to the task list with the filter `project:name`, so the list
 shows only that project's open tasks. `esc` clears the filter.
 
@@ -146,9 +153,9 @@ In the task view, `j` `k` `g` `G` `ctrl+d` `ctrl+u` scroll the notes, `r`
 reloads, and `esc` `h` `←` go back to the list.
 
 In the project view, the movement and page keys are the same as in the list.
-`enter` shows the project's tasks, `s` and `S` change the order, `tab` shows
-or hides finished projects, `r` reloads, and `p` or `esc` goes back to the
-list.
+`enter` shows the project's tasks, `/` filters the projects by name, `s` and
+`S` change the order, `tab` shows or hides finished projects, and `r`
+reloads. `p` goes back to the list, and so does `esc` when no filter is set.
 
 ## Environment
 
