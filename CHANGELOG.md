@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.4.0](https://github.com/cgardner/herdr-dstask/compare/v0.3.0...v0.4.0) (2026-10-05)
+
+
+### Features
+
+* mark tasks with space and change them all at once ([bc35707](https://github.com/cgardner/herdr-dstask/commit/bc35707229b7a32ee7eb4a5ef621449e305a40b3))
+* reopen the popup on the last view, saved per repository ([a689d13](https://github.com/cgardner/herdr-dstask/commit/a689d138f285006069d4e4eb84cfc2e157cacff9))
+
 ## [0.3.0](https://github.com/cgardner/herdr-dstask/compare/v0.2.0...v0.3.0) (2026-10-05)
 
 
