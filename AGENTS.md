@@ -151,3 +151,24 @@ and total counts.
 - The project view's own name filter, `pfilter`, is a different thing: it
   narrows the projects, not the tasks. It has its own prompt kind,
   `promptProjectFilter`, so its text can never land in the task filter.
+
+## The saved view
+
+`internal/state` writes one JSON file for each repository, under
+`HERDR_PLUGIN_STATE_DIR/views`, which is where Herdr says plugin state goes.
+The file name is a hash of the repository's real path, so a symlink and a
+trailing slash find the same file. Never write state inside the repository:
+it is a git repository that `dstask sync` pushes.
+
+- Every state failure is silent. A lost view must never stop the popup from
+  opening, and a view that cannot be saved is not worth an error.
+- `ui.Model.State` names the list behind a task view, a prompt, a
+  confirmation or the help screen. Those are short steps, not places.
+- A restored task and project wait in `wantTask` and `wantProject` until the
+  first load of their list arrives. A task is found by UUID, because IDs
+  change when tasks are resolved or added.
+- `cli.loadState` and `cli.saveState` are seams. The CLI tests replace them,
+  so a test run never writes to the real state folder. A new CLI test that
+  reaches `runProgram` must call `stubState` or `stubProgram`.
+- When the popup reopens on the project view, `Init` returns a `tea.Batch` of
+  both loads. The UI test helper `settle` runs each command in a batch.

@@ -96,8 +96,13 @@ type Model struct {
 	projectsLoading bool
 	psort           projectSort
 	pfilter         string // words in the project name
-	pcursor         int
-	poffset         int
+
+	// wantTask and wantProject hold a restored selection until the first
+	// load of its list arrives.
+	wantTask    string
+	wantProject string
+	pcursor     int
+	poffset     int
 
 	width  int
 	height int
@@ -146,7 +151,7 @@ type (
 )
 
 // Init loads the first listing.
-func (m Model) Init() tea.Cmd { return m.load() }
+func (m Model) Init() tea.Cmd { return m.initCmd() }
 
 func (m Model) load() tea.Cmd {
 	b, resolved := m.backend, m.showResolved
@@ -235,7 +240,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // setTasks installs a fresh listing and keeps the cursor on the same task
 // when that task is still present.
 func (m *Model) setTasks(tasks []dstask.Task) {
-	keep := ""
+	keep := m.wantTask
+	m.wantTask = ""
 	if t, ok := m.selected(); ok {
 		keep = t.UUID
 	}

@@ -9,6 +9,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"github.com/cgardner/herdr-dstask/internal/state"
 	"github.com/cgardner/herdr-dstask/internal/store"
 	"github.com/cgardner/herdr-dstask/internal/ui"
 )
@@ -35,11 +36,18 @@ var (
 	// openStore opens the repository that dstask itself would use.
 	openStore = store.New
 
-	// runProgram is the one call that needs a real terminal.
-	runProgram = func(m ui.Model) error {
-		_, err := tea.NewProgram(m, tea.WithAltScreen()).Run()
-		return err
+	// runProgram is the one call that needs a real terminal. It returns the
+	// model as the user left it, so the view can be saved.
+	runProgram = func(m ui.Model) (ui.Model, error) {
+		final, err := tea.NewProgram(m, tea.WithAltScreen()).Run()
+		fm, _ := final.(ui.Model)
+		return fm, err
 	}
+
+	// loadState and saveState read and write the last view of a repository,
+	// outside the repository.
+	loadState = state.Load
+	saveState = state.Save
 )
 
 // Run is the whole program. It returns the process exit status.
@@ -76,9 +84,17 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		return 0
 	}
 
-	if err := runProgram(ui.New(backend{s})); err != nil {
+	saved := loadState(s.Repo())
+	if *all {
+		saved.IgnoreContext = true // the flag wins over the saved view
+	}
+	final, err := runProgram(ui.New(backend{s}).Restore(saved))
+	if err != nil {
 		fmt.Fprintln(stderr, "herdr-dstask:", err)
 		return 1
 	}
+	v := final.State()
+	v.Repo = s.Repo()
+	_ = saveState(v) // a view that cannot be saved is not worth an error
 	return 0
 }

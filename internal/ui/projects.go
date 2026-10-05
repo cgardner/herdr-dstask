@@ -85,7 +85,8 @@ func (m Model) openProjects() (tea.Model, tea.Cmd) {
 // them. Under the progress order they would otherwise fill the top rows at
 // 100%, above the projects that still need work.
 func (m *Model) setProjects(all []store.Project) {
-	keep := ""
+	keep := m.wantProject
+	m.wantProject = ""
 	if p, ok := m.selectedProject(); ok {
 		keep = p.Name
 	}

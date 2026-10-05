@@ -95,10 +95,14 @@ func settle(t *testing.T, m Model, cmd tea.Cmd, depth int) Model {
 	case <-time.After(50 * time.Millisecond):
 		return m
 	}
-	switch msg.(type) {
+	switch msg := msg.(type) {
 	case loadedMsg, actionMsg, projectsMsg:
 		next, more := m.Update(msg)
 		return settle(t, next.(Model), more, depth+1)
+	case tea.BatchMsg:
+		for _, c := range msg {
+			m = settle(t, m, c, depth+1)
+		}
 	}
 	return m
 }

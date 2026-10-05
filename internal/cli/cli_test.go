@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cgardner/herdr-dstask/internal/state"
 	"github.com/cgardner/herdr-dstask/internal/store"
 	"github.com/cgardner/herdr-dstask/internal/ui"
 )
@@ -38,9 +39,22 @@ func stubProgram(t *testing.T, err error) *int {
 	t.Helper()
 	calls := 0
 	prev := runProgram
-	runProgram = func(ui.Model) error { calls++; return err }
+	runProgram = func(m ui.Model) (ui.Model, error) { calls++; return m, err }
 	t.Cleanup(func() { runProgram = prev })
+	stubState(t, state.View{})
 	return &calls
+}
+
+// stubState replaces the state seams, so a test never reads or writes the
+// real state folder. It returns the views that the run saved.
+func stubState(t *testing.T, saved state.View) *[]state.View {
+	t.Helper()
+	var writes []state.View
+	prevLoad, prevSave := loadState, saveState
+	loadState = func(string) state.View { return saved }
+	saveState = func(v state.View) error { writes = append(writes, v); return nil }
+	t.Cleanup(func() { loadState, saveState = prevLoad, prevSave })
+	return &writes
 }
 
 func run(args ...string) (int, string, string) {
@@ -139,5 +153,54 @@ func TestBackendAdaptsTheEditors(t *testing.T) {
 	}
 	if ed, err := b.EditTask(99); err == nil || ed != nil {
 		t.Errorf("an unknown id should fail with no editor, got %v", ed)
+	}
+}
+
+func TestTheViewIsRestoredAndSaved(t *testing.T) {
+	s := scratch(t)
+	var started ui.Model
+	prev := runProgram
+	runProgram = func(m ui.Model) (ui.Model, error) { started = m; return m, nil }
+	t.Cleanup(func() { runProgram = prev })
+	writes := stubState(t, state.View{View: "projects", Filter: "project:atlas", ProjectSort: "open"})
+
+	if code, _, _ := run(); code != 0 {
+		t.Fatalf("code = %d", code)
+	}
+	got := started.State()
+	if got.View != "projects" || got.Filter != "project:atlas" || got.ProjectSort != "open" {
+		t.Errorf("the UI did not start from the saved view: %+v", got)
+	}
+	if len(*writes) != 1 {
+		t.Fatalf("want one save, got %d", len(*writes))
+	}
+	w := (*writes)[0]
+	if w.Repo != s.Repo() || w.View != "projects" || w.Filter != "project:atlas" {
+		t.Errorf("saved %+v", w)
+	}
+}
+
+func TestTheAllFlagWinsOverTheSavedView(t *testing.T) {
+	scratch(t)
+	var started ui.Model
+	prev := runProgram
+	runProgram = func(m ui.Model) (ui.Model, error) { started = m; return m, nil }
+	t.Cleanup(func() { runProgram = prev })
+	stubState(t, state.View{IgnoreContext: false})
+	run("--all")
+	if !started.State().IgnoreContext {
+		t.Errorf("--all should ignore the context even when the saved view did not")
+	}
+}
+
+func TestNothingIsSavedWhenTheUIFails(t *testing.T) {
+	scratch(t)
+	prev := runProgram
+	runProgram = func(m ui.Model) (ui.Model, error) { return m, errors.New("no terminal") }
+	t.Cleanup(func() { runProgram = prev })
+	writes := stubState(t, state.View{})
+	run()
+	if len(*writes) != 0 {
+		t.Errorf("a failed run must not save a view")
 	}
 }

@@ -105,6 +105,29 @@ library call. Like that command, the view ignores the context, because a
 project's progress needs all of its tasks. The view loads the resolved tasks
 too, so it opens a little slower than the list: about 200 ms for 750 tasks.
 
+## It remembers where you were
+
+The popup opens where you left it: on the task list or the project view,
+with the same filters, the same open or resolved list, the same context
+setting, the same project order and filter, and the same task and project
+selected. A task is found again by its UUID, so the selection survives the
+ID changes that dstask makes when tasks are resolved or added. A task view,
+a prompt or the help screen is not restored. The popup opens on the list
+behind it.
+
+Each repository has its own saved view, so the sandbox copy and your real
+tasks never share filters. The views are kept outside the repository, in
+Herdr's state folder for the plugin:
+
+```
+~/.local/state/herdr/plugins/cgardner.herdr-dstask/views/<hash>.json
+```
+
+Outside Herdr, they go to `$XDG_STATE_HOME/herdr-dstask/views`, or to
+`~/.local/state/herdr-dstask/views`. Each file names its repository in the
+`repo` field. Delete a file to start that repository from the defaults.
+`--all` ignores the context even when the saved view does not.
+
 ## Keys
 
 In the list:
