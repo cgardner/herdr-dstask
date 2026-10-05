@@ -30,14 +30,8 @@ func (f *fake) Resolved() ([]dstask.Task, error) { return f.resolved, nil }
 func (f *fake) ContextString() string            { return "+work" }
 func (f *fake) SetIgnoreContext(v bool)          { f.ignore = v }
 func (f *fake) record(s string) error            { f.calls = append(f.calls, s); return f.fail }
-func (f *fake) Done(id int) error                { return f.record(fmt.Sprint("done ", id)) }
-func (f *fake) Start(id int) error               { return f.record(fmt.Sprint("start ", id)) }
-func (f *fake) Stop(id int) error                { return f.record(fmt.Sprint("stop ", id)) }
-func (f *fake) Remove(id int) error              { return f.record(fmt.Sprint("remove ", id)) }
 func (f *fake) Undo() error                      { return f.record("undo") }
 func (f *fake) Add(in string) error              { return f.record("add " + in) }
-func (f *fake) Modify(id int, s string) error    { return f.record(fmt.Sprintf("modify %d %s", id, s)) }
-func (f *fake) Note(id int, s string) error      { return f.record(fmt.Sprintf("note %d %s", id, s)) }
 func (f *fake) EditTask(id int) (Editor, error)  { return f.editor(fmt.Sprint("edit ", id)) }
 func (f *fake) EditNotes(id int) (Editor, error) { return f.editor(fmt.Sprint("edit-notes ", id)) }
 
@@ -432,3 +426,22 @@ func TestHashKeyOpensTheIDSearch(t *testing.T) {
 }
 
 func (f *fake) Projects() ([]store.Project, error) { return f.projects, f.projectsErr }
+
+func ids(refs []store.Ref) string {
+	var parts []string
+	for _, r := range refs {
+		parts = append(parts, fmt.Sprint(r.ID))
+	}
+	return strings.Join(parts, ",")
+}
+
+func (f *fake) DoneAll(r []store.Ref) error   { return f.record("done " + ids(r)) }
+func (f *fake) StartAll(r []store.Ref) error  { return f.record("start " + ids(r)) }
+func (f *fake) StopAll(r []store.Ref) error   { return f.record("stop " + ids(r)) }
+func (f *fake) RemoveAll(r []store.Ref) error { return f.record("remove " + ids(r)) }
+func (f *fake) ModifyAll(r []store.Ref, s string) error {
+	return f.record(fmt.Sprintf("modify %s %s", ids(r), s))
+}
+func (f *fake) NoteAll(r []store.Ref, s string) error {
+	return f.record(fmt.Sprintf("note %s %s", ids(r), s))
+}

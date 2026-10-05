@@ -172,3 +172,23 @@ it is a git repository that `dstask sync` pushes.
   reaches `runProgram` must call `stubState` or `stubProgram`.
 - When the popup reopens on the project view, `Init` returns a `tea.Batch` of
   both loads. The UI test helper `settle` runs each command in a batch.
+
+## Bulk changes
+
+Every change goes through `Store.changeAll`, one task or many. It is the
+place to keep three rules:
+
+- **One commit for each change.** The dstask CLI commits once per task, so
+  `dstask undo`, one `git revert`, undoes only the last task of a bulk
+  change. One commit lets `u` undo all of it. A change to one task keeps the
+  CLI's commit message, so the history reads the same as the CLI's.
+- **All or nothing.** Every task is changed in memory first, and
+  `SavePendingChanges` runs only when all of them succeed.
+- **The UUID check.** The UI passes `store.Ref{ID, UUID}`. dstask addresses
+  tasks by ID, and an ID can move to another task between the load and the
+  change, so `changeAll` refuses a task whose UUID differs.
+
+In the UI, marks are UUIDs in `Model.marked`. A prompt or a confirmation
+fixes its tasks in `targets` when it opens. `pruneMarks` drops marks on tasks
+that are no longer loaded. `bulkKey` handles a change while marks exist;
+`e` and `N` stay single-task, and the task view ignores marks.

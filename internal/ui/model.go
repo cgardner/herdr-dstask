@@ -28,12 +28,15 @@ type Backend interface {
 	Resolved() ([]dstask.Task, error)
 	ContextString() string
 	SetIgnoreContext(bool)
-	Done(id int) error
-	Start(id int) error
-	Stop(id int) error
-	Remove(id int) error
-	Modify(id int, modifiers string) error
-	Note(id int, text string) error
+	// The changes take a list of tasks and make one commit for all of them,
+	// so a bulk change is undone with one `u`. A single change is a list of
+	// one.
+	DoneAll(refs []store.Ref) error
+	StartAll(refs []store.Ref) error
+	StopAll(refs []store.Ref) error
+	RemoveAll(refs []store.Ref) error
+	ModifyAll(refs []store.Ref, modifiers string) error
+	NoteAll(refs []store.Ref, text string) error
 	Add(input string) error
 	Undo() error
 	EditTask(id int) (Editor, error)
@@ -113,9 +116,17 @@ type Model struct {
 	input  textinput.Model
 	detail viewport.Model
 
-	// target is the task a prompt or confirm acts on, fixed when it opens so
-	// a reload underneath cannot redirect the change to another task.
-	target dstask.Task
+	// target is the task the task view shows, and the task a single change
+	// acts on. targets is the exact list a prompt or confirm acts on, fixed
+	// when it opens so a reload underneath cannot redirect the change, and
+	// targetLabel names it: "#3" or "3 tasks".
+	target      dstask.Task
+	targets     []store.Ref
+	targetLabel string
+
+	// marked holds the UUIDs of the tasks marked with space. A UUID survives
+	// the ID changes that a reload can bring.
+	marked map[string]bool
 
 	selectionBg lipgloss.Color
 
@@ -147,6 +158,9 @@ type (
 	actionMsg struct {
 		ok  string
 		err error
+		// clearMarks is set by a change to the marked tasks, which are done
+		// with once the change succeeds.
+		clearMarks bool
 	}
 )
 
@@ -171,6 +185,12 @@ func (m Model) load() tea.Cmd {
 // act runs a change in the background and reports it with the given text.
 func act(ok string, fn func() error) tea.Cmd {
 	return func() tea.Msg { return actionMsg{ok: ok, err: fn()} }
+}
+
+// actOn is act for a change that may be to the marked tasks. When it is,
+// a success clears the marks.
+func actOn(bulk bool, ok string, fn func() error) tea.Cmd {
+	return func() tea.Msg { return actionMsg{ok: ok, err: fn(), clearMarks: bulk} }
 }
 
 // Update handles one message.
@@ -212,6 +232,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.setStatus(msg.ok)
+		if msg.clearMarks {
+			m.marked = nil
+		}
 		m.loading = true
 		return m, m.load()
 
@@ -246,6 +269,7 @@ func (m *Model) setTasks(tasks []dstask.Task) {
 		keep = t.UUID
 	}
 	m.all = tasks
+	m.pruneMarks()
 	m.applyFilter()
 	for i, t := range m.visible {
 		if t.UUID == keep {
@@ -376,7 +400,11 @@ func (m Model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "q", "ctrl+c":
 		return m, tea.Quit
 	case "esc":
-		// esc clears one filter at a time before it quits.
+		// esc clears the marks, then one filter at a time, before it quits.
+		if len(m.marked) > 0 {
+			m.marked = nil
+			return m, nil
+		}
 		if m.filter != "" {
 			m.filter = ""
 			m.applyFilter()
@@ -430,6 +458,7 @@ func (m Model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.openPrompt(promptFilter, "#")
 	case "tab":
 		m.showResolved = !m.showResolved
+		m.marked = nil // resolved tasks cannot be changed, so marks mean nothing there
 		m.filter = ""
 		m.activeOnly = false
 		m.cursor, m.offset = 0, 0
@@ -452,6 +481,10 @@ func (m Model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "p":
 		return m.openProjects()
+	case " ":
+		return m.toggleMark()
+	case "*":
+		return m.toggleMarkAll()
 	default:
 		return m.taskKey(msg)
 	}
@@ -503,6 +536,11 @@ func (m Model) taskKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if !ok || !strings.Contains("dsmnNex", key) || len(key) != 1 {
 		return m, nil
 	}
+	// The marked tasks, when there are any, take the change in the list. The
+	// task view is about one task, so there the change is always that task.
+	if m.mode == modeList && len(m.marked) > 0 {
+		return m.bulkKey(key)
+	}
 	// dstask gives a resolved task ID 0 and addresses tasks only by ID, so the
 	// CLI offers no way to change one.
 	if t.ID == 0 {
@@ -510,29 +548,37 @@ func (m Model) taskKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	id := t.ID
+	one := []store.Ref{{ID: t.ID, UUID: t.UUID}}
 	switch key {
 	case "d":
-		return m, act(fmt.Sprintf("resolved #%d", id), func() error { return m.backend.Done(id) })
+		return m, act(fmt.Sprintf("resolved #%d", id), func() error { return m.backend.DoneAll(one) })
 	case "s":
 		if t.Status == dstask.STATUS_ACTIVE {
-			return m, act(fmt.Sprintf("stopped #%d", id), func() error { return m.backend.Stop(id) })
+			return m, act(fmt.Sprintf("stopped #%d", id), func() error { return m.backend.StopAll(one) })
 		}
-		return m, act(fmt.Sprintf("started #%d", id), func() error { return m.backend.Start(id) })
-	case "m":
+		return m, act(fmt.Sprintf("started #%d", id), func() error { return m.backend.StartAll(one) })
+	case "m", "n", "x":
 		m.target = t
-		return m.openPrompt(promptModify, "")
-	case "n":
-		m.target = t
-		return m.openPrompt(promptNote, "")
-	case "x":
-		m.target = t
-		m.back, m.mode = m.mode, modeConfirm
-		return m, nil
+		m.targets, m.targetLabel = one, fmt.Sprintf("#%d", id)
+		return m.openTargeted(key)
 	case "e":
 		return m.runEditor(m.backend.EditTask, id, fmt.Sprintf("edited #%d", id))
 	case "N":
 		return m.runEditor(m.backend.EditNotes, id, fmt.Sprintf("edited the notes of #%d", id))
 	}
+	return m, nil
+}
+
+// openTargeted opens the prompt or confirmation for m, n or x, which act on
+// m.targets.
+func (m Model) openTargeted(key string) (tea.Model, tea.Cmd) {
+	switch key {
+	case "m":
+		return m.openPrompt(promptModify, "")
+	case "n":
+		return m.openPrompt(promptNote, "")
+	}
+	m.back, m.mode = m.mode, modeConfirm
 	return m, nil
 }
 
@@ -586,7 +632,8 @@ func (m Model) updatePrompt(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		value := m.input.Value()
 		m.mode = m.back
 		m.input.Blur()
-		id := m.target.ID
+		refs, label := m.targets, m.targetLabel
+		bulk := len(refs) > 1 || len(m.marked) > 0
 		switch m.prompt {
 		case promptFilter:
 			m.filter = strings.TrimSpace(value)
@@ -594,9 +641,9 @@ func (m Model) updatePrompt(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.applyFilter()
 			return m, nil
 		case promptModify:
-			return m, act(fmt.Sprintf("modified #%d", id), func() error { return m.backend.Modify(id, value) })
+			return m, actOn(bulk, "modified "+label, func() error { return m.backend.ModifyAll(refs, value) })
 		case promptNote:
-			return m, act(fmt.Sprintf("noted #%d", id), func() error { return m.backend.Note(id, value) })
+			return m, actOn(bulk, "noted "+label, func() error { return m.backend.NoteAll(refs, value) })
 		case promptAdd:
 			return m, act("added a task", func() error { return m.backend.Add(value) })
 		case promptProjectFilter:
@@ -622,12 +669,12 @@ func (m Model) updatePrompt(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m Model) updateConfirm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	m.mode = m.back
 	if msg.String() != "y" {
-		m.setStatus("kept #" + fmt.Sprint(m.target.ID))
+		m.setStatus("kept " + m.targetLabel)
 		return m, nil
 	}
-	id := m.target.ID
 	if m.mode == modeDetail {
 		m.mode = modeList
 	}
-	return m, act(fmt.Sprintf("removed #%d", id), func() error { return m.backend.Remove(id) })
+	refs, bulk := m.targets, len(m.targets) > 1 || len(m.marked) > 0
+	return m, actOn(bulk, "removed "+m.targetLabel, func() error { return m.backend.RemoveAll(refs) })
 }

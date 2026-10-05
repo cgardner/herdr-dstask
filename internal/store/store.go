@@ -185,9 +185,35 @@ func (s *Store) Projects() ([]Project, error) {
 	return out, err
 }
 
+// Ref names one task for a change: its ID, which dstask addresses tasks by,
+// and its UUID, which the store checks so a change never reaches a task that
+// took over the ID since the list was loaded. An empty UUID skips the check.
+type Ref struct {
+	ID   int
+	UUID string
+}
+
+// verb is the commit message for a change, in the CLI's words for one task
+// and as a count for several.
+type verb struct{ one, many string }
+
+var (
+	verbDone   = verb{"Resolved %s", "Resolved %d tasks"}
+	verbStart  = verb{"Started %s", "Started %d tasks"}
+	verbStop   = verb{"Stopped %s", "Stopped %d tasks"}
+	verbRemove = verb{"Removed: %s", "Removed %d tasks"}
+	verbModify = verb{"Modified %s", "Modified %d tasks"}
+	verbNote   = verb{"Edit note %s", "Edit note on %d tasks"}
+	verbEdit   = verb{"Edited %s", "Edited %d tasks"}
+	verbEditN  = verb{"Edit note %s", "Edit note on %d tasks"}
+)
+
 // Done resolves a task.
-func (s *Store) Done(id int) error {
-	return s.change(id, "Resolved %s", func(t *dstask.Task) error {
+func (s *Store) Done(id int) error { return s.DoneAll([]Ref{{ID: id}}) }
+
+// DoneAll resolves tasks in one commit.
+func (s *Store) DoneAll(r []Ref) error {
+	return s.changeAll(r, verbDone, func(t *dstask.Task) error {
 		t.Status = dstask.STATUS_RESOLVED
 		t.Resolved = time.Now()
 		return nil
@@ -195,24 +221,33 @@ func (s *Store) Done(id int) error {
 }
 
 // Start marks a task active.
-func (s *Store) Start(id int) error {
-	return s.change(id, "Started %s", func(t *dstask.Task) error {
+func (s *Store) Start(id int) error { return s.StartAll([]Ref{{ID: id}}) }
+
+// StartAll marks tasks active in one commit.
+func (s *Store) StartAll(r []Ref) error {
+	return s.changeAll(r, verbStart, func(t *dstask.Task) error {
 		t.Status = dstask.STATUS_ACTIVE
 		return nil
 	})
 }
 
 // Stop pauses an active task. The CLI's stop writes "paused", not "pending".
-func (s *Store) Stop(id int) error {
-	return s.change(id, "Stopped %s", func(t *dstask.Task) error {
+func (s *Store) Stop(id int) error { return s.StopAll([]Ref{{ID: id}}) }
+
+// StopAll pauses tasks in one commit.
+func (s *Store) StopAll(r []Ref) error {
+	return s.changeAll(r, verbStop, func(t *dstask.Task) error {
 		t.Status = dstask.STATUS_PAUSED
 		return nil
 	})
 }
 
 // Remove deletes a task. The caller must confirm first.
-func (s *Store) Remove(id int) error {
-	return s.change(id, "Removed: %s", func(t *dstask.Task) error {
+func (s *Store) Remove(id int) error { return s.RemoveAll([]Ref{{ID: id}}) }
+
+// RemoveAll deletes tasks in one commit. The caller must confirm first.
+func (s *Store) RemoveAll(r []Ref) error {
+	return s.changeAll(r, verbRemove, func(t *dstask.Task) error {
 		t.Deleted = true
 		return nil
 	})
@@ -221,16 +256,21 @@ func (s *Store) Remove(id int) error {
 // Modify applies dstask modifiers such as "+tag -tag project:x P1 due:friday",
 // parsed by the library's own ParseQuery.
 func (s *Store) Modify(id int, modifiers string) error {
+	return s.ModifyAll([]Ref{{ID: id}}, modifiers)
+}
+
+// ModifyAll applies the same modifiers to tasks in one commit.
+func (s *Store) ModifyAll(r []Ref, modifiers string) error {
 	q := parse(dstask.CMD_MODIFY, modifiers)
 	if len(q.IDs) > 0 {
 		// ParseQuery reads every leading number as a task ID. Refusing it
-		// keeps the change on the task the user selected.
+		// keeps the change on the tasks the user selected.
 		return fmt.Errorf("%d reads as a task id, not a modifier", q.IDs[0])
 	}
 	if !q.HasOperators() {
 		return errors.New("no modifiers given (for example +tag -tag project:x P1 due:friday)")
 	}
-	return s.change(id, "Modified %s", func(t *dstask.Task) error {
+	return s.changeAll(r, verbModify, func(t *dstask.Task) error {
 		notes := t.Notes
 		t.Modify(q)
 		// Task.Modify appends a newline to non-empty notes even when the
@@ -244,12 +284,15 @@ func (s *Store) Modify(id int, modifiers string) error {
 
 // Note appends a line to the task's notes, as `dstask N note text` does. The
 // text is not parsed, so it can hold anything.
-func (s *Store) Note(id int, text string) error {
+func (s *Store) Note(id int, text string) error { return s.NoteAll([]Ref{{ID: id}}, text) }
+
+// NoteAll appends the same line to the notes of tasks in one commit.
+func (s *Store) NoteAll(r []Ref, text string) error {
 	text = strings.TrimSpace(text)
 	if text == "" {
 		return errors.New("empty note")
 	}
-	return s.change(id, "Edit note %s", func(t *dstask.Task) error {
+	return s.changeAll(r, verbNote, func(t *dstask.Task) error {
 		if t.Notes == "" {
 			t.Notes = text
 		} else {
@@ -311,29 +354,58 @@ func (s *Store) Undo() error {
 	})
 }
 
-// change loads the open tasks, applies fn to one of them, and saves and
-// commits the result with a message in the CLI's words.
-func (s *Store) change(id int, message string, fn func(*dstask.Task) error) error {
-	if id <= 0 {
-		return errors.New("resolved tasks have no id, so dstask cannot address them")
+// changeAll loads the open tasks, applies fn to each named task, and saves
+// and commits the result as one commit, so `u` undoes the whole change.
+//
+// It is all or nothing. Every task is checked and changed in memory first,
+// and nothing is written unless every one succeeds: a task that is missing,
+// that took over another task's ID, or that dstask refuses (such as a task
+// with an open checklist being resolved) stops the whole change.
+func (s *Store) changeAll(r []Ref, v verb, fn func(*dstask.Task) error) error {
+	if len(r) == 0 {
+		return errors.New("no tasks selected")
+	}
+	for _, ref := range r {
+		if ref.ID <= 0 {
+			return errors.New("resolved tasks have no id, so dstask cannot address them")
+		}
 	}
 	return quiet(func() error {
 		ts, err := dstask.LoadTaskSet(s.conf.Repo, s.conf.IDsFile, false)
 		if err != nil {
 			return err
 		}
-		task, err := ts.GetByID(id)
-		if err != nil {
-			return err
-		}
-		if err := fn(&task); err != nil {
-			return err
-		}
-		if err := ts.UpdateTask(task); err != nil {
-			return err
+		changed := make([]dstask.Task, 0, len(r))
+		seen := map[int]bool{}
+		for _, ref := range r {
+			if seen[ref.ID] {
+				continue
+			}
+			seen[ref.ID] = true
+			task, err := ts.GetByID(ref.ID)
+			if err != nil {
+				return err
+			}
+			if ref.UUID != "" && task.UUID != ref.UUID {
+				return fmt.Errorf("task %d changed since the list loaded; nothing was changed (r reloads)", ref.ID)
+			}
+			if err := fn(&task); err != nil {
+				return err
+			}
+			if err := ts.UpdateTask(task); err != nil {
+				return fmt.Errorf("%s: %w; nothing was changed", task, err)
+			}
+			changed = append(changed, task)
 		}
 		ts.SavePendingChanges()
-		return dstask.GitCommit(s.conf.Repo, message, task)
+		if len(changed) == 1 {
+			return dstask.GitCommit(s.conf.Repo, v.one, changed[0])
+		}
+		lines := make([]string, len(changed))
+		for i, t := range changed {
+			lines[i] = t.String()
+		}
+		return dstask.GitCommit(s.conf.Repo, "%s\n\n%s", fmt.Sprintf(v.many, len(changed)), strings.Join(lines, "\n"))
 	})
 }
 
@@ -401,11 +473,11 @@ func (e *Edit) Apply() error {
 	if err != nil {
 		return err
 	}
-	message := "Edited %s"
+	v := verbEdit
 	if e.notes {
-		message = "Edit note %s"
+		v = verbEditN
 	}
-	return e.store.change(e.id, message, func(t *dstask.Task) error {
+	return e.store.changeAll([]Ref{{ID: e.id}}, v, func(t *dstask.Task) error {
 		// The ID can point at another task if the list changed while the
 		// editor was open. The UUID cannot.
 		if t.UUID != e.uuid {

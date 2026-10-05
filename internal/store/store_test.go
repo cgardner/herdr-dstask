@@ -463,3 +463,134 @@ func TestProjectsCountProgress(t *testing.T) {
 		t.Errorf("a project with no tasks is 0%% done")
 	}
 }
+
+func commits(t *testing.T, s *Store) int {
+	t.Helper()
+	return strings.Count(gitLog(t, s), "\n")
+}
+
+func refsOf(t *testing.T, s *Store, ids ...int) []Ref {
+	t.Helper()
+	open, err := s.Open()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out []Ref
+	for _, id := range ids {
+		for _, task := range open {
+			if task.ID == id {
+				out = append(out, Ref{ID: id, UUID: task.UUID})
+			}
+		}
+	}
+	return out
+}
+
+func TestBulkChangesAreOneCommit(t *testing.T) {
+	s := repo(t)
+	for _, in := range []string{"one", "two", "three", "four"} {
+		mustAdd(t, s, in)
+	}
+	before := commits(t, s)
+	if err := s.ModifyAll(refsOf(t, s, 1, 2, 3), "+bulk P1"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.DoneAll(refsOf(t, s, 1, 2)); err != nil {
+		t.Fatal(err)
+	}
+	if got := commits(t, s) - before; got != 2 {
+		t.Errorf("want 2 commits for 2 bulk changes, got %d", got)
+	}
+	msg, _ := exec.Command("git", "-C", s.Repo(), "log", "-1", "--format=%B").Output()
+	if !strings.HasPrefix(string(msg), "Resolved 2 tasks\n\n1: one\n2: two") {
+		t.Errorf("commit message = %q", msg)
+	}
+	open, _ := s.Open()
+	if len(open) != 2 {
+		t.Fatalf("open = %d, want 2", len(open))
+	}
+	for _, task := range open {
+		tagged := len(task.Tags) == 1 && task.Tags[0] == "bulk" && task.Priority == "P1"
+		if (task.Summary == "three") != tagged {
+			t.Errorf("modify reached the wrong tasks: %+v", task)
+		}
+	}
+	// One undo reverts the whole bulk change.
+	if err := s.Undo(); err != nil {
+		t.Fatal(err)
+	}
+	if open, _ := s.Open(); len(open) != 4 {
+		t.Errorf("undo should bring back both tasks, open = %d", len(open))
+	}
+}
+
+func TestBulkChangesAreAllOrNothing(t *testing.T) {
+	s := repo(t)
+	mustAdd(t, s, "plain")
+	mustAdd(t, s, "has a checklist")
+	if err := s.Note(2, "- [ ] not done yet"); err != nil {
+		t.Fatal(err)
+	}
+	before := commits(t, s)
+	err := s.DoneAll(refsOf(t, s, 1, 2))
+	if err == nil || !strings.Contains(err.Error(), "nothing was changed") {
+		t.Fatalf("err = %v", err)
+	}
+	if open, _ := s.Open(); len(open) != 2 || commits(t, s) != before {
+		t.Errorf("a failed bulk change must change nothing")
+	}
+}
+
+func TestBulkChangesRefuseAMovedID(t *testing.T) {
+	s := repo(t)
+	mustAdd(t, s, "first")
+	stale := refsOf(t, s, 1)
+	if err := s.Remove(1); err != nil {
+		t.Fatal(err)
+	}
+	mustAdd(t, s, "took over the id") // gets ID 1
+	err := s.DoneAll(stale)
+	if err == nil || !strings.Contains(err.Error(), "changed since the list loaded") {
+		t.Fatalf("err = %v", err)
+	}
+	if open, _ := s.Open(); len(open) != 1 || open[0].Status != "pending" {
+		t.Errorf("the other task was changed")
+	}
+}
+
+func TestBulkStartStopRemoveAndNote(t *testing.T) {
+	s := repo(t)
+	mustAdd(t, s, "a")
+	mustAdd(t, s, "b")
+	r := refsOf(t, s, 1, 2)
+	r = append(r, r[0]) // a task named twice is changed once
+	for _, step := range []func() error{
+		func() error { return s.StartAll(r) },
+		func() error { return s.NoteAll(r, "shared line") },
+		func() error { return s.StopAll(r) },
+	} {
+		if err := step(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, task := range func() []dstask.Task { o, _ := s.Open(); return o }() {
+		if task.Status != "paused" || task.Notes != "shared line" {
+			t.Errorf("task %d: status=%s notes=%q", task.ID, task.Status, task.Notes)
+		}
+	}
+	if err := s.RemoveAll(r); err != nil {
+		t.Fatal(err)
+	}
+	if open, _ := s.Open(); len(open) != 0 {
+		t.Errorf("remove left %d tasks", len(open))
+	}
+	if err := s.DoneAll(nil); err == nil {
+		t.Errorf("no tasks should be an error")
+	}
+	if err := s.NoteAll(r, "  "); err == nil {
+		t.Errorf("an empty note should be an error")
+	}
+	if err := s.ModifyAll(r, "words only"); err == nil {
+		t.Errorf("a modify without operators should be an error")
+	}
+}

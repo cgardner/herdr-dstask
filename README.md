@@ -143,12 +143,14 @@ In the list:
 | `/` | filter by words in the summary, project, tags or notes |
 | `#` | find by ID: opens the filter with `#` typed |
 | `A` | show only active tasks; press again to show all |
+| `space` | mark the task and move down |
+| `*` | mark every task shown, or unmark them all |
 | `tab` | switch between open and resolved tasks |
 | `c` | switch between the dstask context and all tasks |
 | `p` | open the project view |
 | `r` | reload |
 | `?` | help |
-| `esc` | clear the text filter, then the active filter, then quit |
+| `esc` | clear the marks, then the text filter, then the active filter, then quit |
 | `q` | quit |
 
 In the filter, `project:atlas` matches the tasks of that project, and
@@ -171,6 +173,27 @@ These change a task, in the list and in the task view:
 | `e` | edit the whole task as YAML in `$EDITOR` |
 | `x` | remove, after a confirmation |
 | `u` | undo the last change, as `dstask undo` does |
+
+### Changing many tasks at once
+
+`space` marks the task under the cursor with a `✓` and moves down, so you
+can mark a run of tasks quickly. `*` marks every task in the list, or
+unmarks them all. The header counts the marks. While any task is marked,
+`d`, `s`, `m`, `n` and `x` change every marked task instead of the one under
+the cursor:
+
+- `d` resolves them, and `x` removes them after one confirmation.
+- `m` and `n` ask once and apply the same modifiers or note line to each.
+- `s` starts the marked tasks that are not active. When all of them are
+  active, it stops them.
+
+A bulk change is one git commit, so one `u` undoes all of it. It is all or
+nothing: if dstask refuses one task, for example a task with an open
+checklist, no task changes. Marks stay when you change the filter, and the
+header warns when a filter hides a marked task. `esc` clears the marks
+before it clears a filter. `e` and `N` open one task in an editor, so they
+do not work on marks, and the task view always changes only its own task.
+Marks are not saved when the popup closes.
 
 In the task view, `j` `k` `g` `G` `ctrl+d` `ctrl+u` scroll the notes, `r`
 reloads, and `esc` `h` `←` go back to the list.

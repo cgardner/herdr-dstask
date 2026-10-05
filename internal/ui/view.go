@@ -113,6 +113,13 @@ func (m Model) header() string {
 	if m.activeOnly {
 		parts = append(parts, styleActive.Render("▶ active only"))
 	}
+	if n := len(m.marked); n > 0 {
+		marked := styleKey.Render(fmt.Sprintf("%d marked", n))
+		if h := m.hiddenMarks(); h > 0 {
+			marked += styleOverdue.Render(fmt.Sprintf(" (%d hidden by the filter)", h))
+		}
+		parts = append(parts, marked)
+	}
 	if m.filter != "" {
 		parts = append(parts, "filter "+styleTag.Render(m.filter))
 	}
@@ -148,7 +155,12 @@ func (m Model) row(t dstask.Task, selected bool) string {
 		id = fmt.Sprintf("%*s", m.idWidth(), "–")
 	}
 	glyph, glyphStyle := statusMark(t.Status)
-	line := gutter.Render(bar) + sp +
+	// The column after the bar shows a ✓ on a marked task.
+	mark := sp
+	if m.marked[t.UUID] {
+		mark = seg(styleKey, "✓")
+	}
+	line := gutter.Render(bar) + mark +
 		seg(styleDim, id) + sp +
 		seg(priorityStyle(t.Priority), priorityMark(t.Priority)) + sp +
 		seg(glyphStyle, glyph) + sp +
@@ -282,7 +294,11 @@ func (m Model) footer() string {
 	case modePrompt:
 		return m.promptLine()
 	case modeConfirm:
-		return styleError.Render(fit(fmt.Sprintf(" remove #%d %q? y to remove, any other key keeps it", m.target.ID, m.target.Summary), m.width))
+		what := m.targetLabel
+		if len(m.targets) == 1 && m.targets[0].ID == m.target.ID {
+			what = fmt.Sprintf("%s %q", m.targetLabel, m.target.Summary)
+		}
+		return styleError.Render(fit(fmt.Sprintf(" remove %s? y to remove, any other key keeps it", what), m.width))
 	}
 	if m.status != "" {
 		if m.statusErr {
@@ -291,6 +307,9 @@ func (m Model) footer() string {
 			line = styleOK.Render(fit(" "+m.status, m.width))
 		}
 		return line
+	}
+	if m.mode == modeList && len(m.marked) > 0 {
+		return hints(m.width, "space", "mark", "d", "done", "s", "start/stop", "m", "modify", "n", "note", "x", "remove", "esc", "clear marks")
 	}
 	if m.mode == modeDetail {
 		return hints(m.width, "esc", "back", "s", "start/stop", "d", "done", "m", "modify", "n", "note", "N", "edit notes", "e", "edit", "x", "remove", "?", "help")
@@ -301,8 +320,8 @@ func (m Model) footer() string {
 func (m Model) promptLine() string {
 	label := map[promptKind]string{
 		promptFilter: "filter",
-		promptModify: fmt.Sprintf("modify #%d", m.target.ID),
-		promptNote:   fmt.Sprintf("note #%d", m.target.ID),
+		promptModify: "modify " + m.targetLabel,
+		promptNote:   "note " + m.targetLabel,
 		promptAdd:    "add",
 
 		promptProjectFilter: "filter projects",
@@ -395,10 +414,12 @@ func (m Model) viewHelp() string {
 		{"→ l pgdn", "next page"},
 		{"← h pgup", "previous page"},
 		{"enter", "view the task"},
-		{"esc h", "back; in the list, clear a filter or quit"},
+		{"esc h", "back; in the list, clear the marks or a filter, or quit"},
 		{"/", "filter by words, or project:name for one project"},
 		{"#", "find by id: #72, or #72 #29 for several"},
 		{"A", "show only active tasks, or all tasks again"},
+		{"space", "mark the task and move down; d s m n x then change every marked task"},
+		{"*", "mark every task shown, or unmark them all"},
 		{"tab", "switch between open and resolved tasks"},
 		{"c", "switch between the dstask context and every task"},
 		{"p", "projects: progress of each project"},
