@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/cgardner/herdr-dstask/compare/v0.2.0...v0.3.0) (2026-10-05)
+
+
+### Features
+
+* filter the project view by name ([2a99d9d](https://github.com/cgardner/herdr-dstask/commit/2a99d9d7e8017327ba05dd9efc25d9c62054f937))
+
 ## [0.2.0](https://github.com/cgardner/herdr-dstask/compare/v0.1.0...v0.2.0) (2026-09-28)
 
 
