@@ -58,15 +58,18 @@ func (m Model) viewList() string {
 	b.WriteByte('\n')
 
 	rows := m.listRows()
+	if m.fallback {
+		msg := "no active tasks (s starts one, A shows all), showing all tasks"
+		if m.filter != "" {
+			msg = "no task matches " + fmt.Sprintf("%q", m.filter) + ", showing all tasks"
+		}
+		b.WriteString(styleOverdue.Render(fit("  "+msg, m.width)))
+		b.WriteByte('\n')
+	}
 	if len(m.visible) == 0 {
 		msg := "no tasks"
-		switch {
-		case m.loading:
+		if m.loading {
 			msg = "loading…"
-		case m.filter != "":
-			msg = "no task matches " + fmt.Sprintf("%q", m.filter)
-		case m.activeOnly:
-			msg = "no active tasks (s starts one, A shows all)"
 		}
 		b.WriteString(styleDim.Render("  " + msg))
 		b.WriteByte('\n')

@@ -274,7 +274,7 @@ func (m Model) showProject() (tea.Model, tea.Cmd) {
 		return m, m.load()
 	}
 	m.applyFilter()
-	if len(m.visible) == 0 && p.OpenTasks() > 0 && m.context != "" && !m.ignoreContext {
+	if m.fallback && p.OpenTasks() > 0 && m.context != "" && !m.ignoreContext {
 		m.setErr(fmt.Errorf("the context %s hides the open tasks of %s; c shows every task", m.context, p.Name))
 	}
 	return m, nil
