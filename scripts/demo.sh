@@ -8,7 +8,8 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-[ -x bin/herdr-dstask ] || make build >/dev/null
+# Always build, so a direct run of this script shows the current code.
+make build >/dev/null
 
 FIXTURE="$(mktemp -d)"
 trap 'rm -rf "$FIXTURE"' EXIT
