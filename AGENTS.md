@@ -45,6 +45,28 @@ works around each one, and a new store method must do the same:
 with `NewAt`. `internal/ui` tests use a fake `Backend`. For a manual test of
 the TUI, set `DSTASK_GIT_REPO` to a scratch repository.
 
+## End-to-end tests
+
+`e2e/` builds the binary once, runs it in a pseudo-terminal (`creack/pty`),
+and reads the screen through `charmbracelet/x/vt`. Each test has its own
+`world`: a task repository, a home and a state folder under `t.TempDir()`, and
+an environment with nothing from the real one but `PATH`. The tests press keys
+and read the screen. They import only `internal/store`, to make the starting
+tasks, so a refactor of `internal/ui` cannot change what they check. Keep it
+so: a test that reaches into the UI stops protecting a refactor.
+
+- The emulator's `Read` carries its answers to terminal queries. `open` copies
+  them back into the pseudo-terminal, as a real terminal does.
+- Find a prompt with `waitPrompt`, which looks at the footer. `› ` alone also
+  matches the filter chips in the header, `‹a› ‹b›`.
+- `q` quits from the list and the project view only. In the task view it goes
+  back, so a test leaves the task view before `quit`.
+- The help screen does not fit in the 20-row default, so its test uses 50.
+- `TestMain` sets `DSTASK_CONTEXT` once. `t.Setenv` would stop `t.Parallel`,
+  and the suite runs in about 12 seconds only because the tests are parallel.
+- A test for "nothing changed" calls `settle` first. It waits until the screen
+  stops changing.
+
 ## Testing the TUI in Herdr
 
 Keys sent fast with `herdr pane send-keys` can arrive together, and Bubble
