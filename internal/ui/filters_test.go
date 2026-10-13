@@ -95,3 +95,34 @@ func TestHeaderShowsEachFilterAndTheKey(t *testing.T) {
 		t.Errorf("only the last filter carries the key: %q", header)
 	}
 }
+
+func TestBackspaceDropsTheLastProjectFilterWord(t *testing.T) {
+	m := startProjects(t, &fake{open: tasks(), projects: filterProjects()})
+	m = drive(t, m, key("/"))
+	m = drive(t, m, append(typed("ai gov"), key("enter"))...)
+	header := strings.Split(m.View(), "\n")[0]
+	if strings.Count(header, "⌫") != 1 || strings.Index(header, "⌫") < strings.Index(header, "gov") {
+		t.Errorf("the last word carries the key: %q", header)
+	}
+	m = drive(t, m, key("j"), key("backspace"))
+	if m.mode != modeProjects || m.pfilter != "ai" || names(m.projects) != "ai-adoption,ai-governance,meeting-ai" {
+		t.Fatalf("one backspace drops %q: mode=%v filter=%q projects=%s", "gov", m.mode, m.pfilter, names(m.projects))
+	}
+	m = drive(t, m, key("backspace"))
+	if m.mode != modeProjects || m.pfilter != "" || len(m.projects) != 4 {
+		t.Errorf("a second backspace clears the filter: mode=%v filter=%q", m.mode, m.pfilter)
+	}
+	if m = drive(t, m, key("backspace")); m.mode != modeList {
+		t.Errorf("with no filter, backspace goes back to the tasks")
+	}
+}
+
+func TestProjectBackspaceKeepsTheSelectedProject(t *testing.T) {
+	m := startProjects(t, &fake{open: tasks(), projects: filterProjects()})
+	m = drive(t, m, key("/"))
+	m = drive(t, m, append(typed("ai gov"), key("enter"))...)
+	m = drive(t, m, key("backspace"))
+	if p, _ := m.selectedProject(); p.Name != "ai-governance" {
+		t.Errorf("the selection should stay on ai-governance, got %q", p.Name)
+	}
+}

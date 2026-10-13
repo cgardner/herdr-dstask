@@ -201,7 +201,15 @@ func (m Model) updateProjects(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		m.mode = modeList
 		return m, nil
-	case "p", "backspace":
+	case "backspace":
+		// backspace drops the last word of the name filter. With no filter
+		// it goes back to the list, as it did before the filter had chips.
+		if m.pfilter != "" {
+			return m.dropProjectFilter(), nil
+		}
+		m.mode = modeList
+		return m, nil
+	case "p":
 		m.mode = modeList
 		return m, nil
 	case "/":
@@ -334,7 +342,7 @@ func (m Model) projectsHeader() string {
 	}
 	parts = append(parts, "sort "+styleKey.Render(m.psort.String()))
 	if m.pfilter != "" {
-		parts = append(parts, "filter "+styleTag.Render(m.pfilter))
+		parts = append(parts, renderChips(wordChips(m.pfilter)))
 	}
 	if m.projectsLoading {
 		parts = append(parts, styleDim.Render("…"))

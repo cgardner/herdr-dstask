@@ -141,7 +141,7 @@ func (m Model) header() string {
 		}
 		parts = append(parts, marked)
 	}
-	if chips := m.filterHeader(); chips != "" {
+	if chips := renderChips(m.filterChips()); chips != "" {
 		parts = append(parts, chips)
 	}
 	if m.loading {
@@ -502,6 +502,7 @@ func (m Model) viewHelp() string {
 		{"projects", ""},
 		{"enter", "show the open tasks of the project"},
 		{"/", "filter projects by words in the name"},
+		{"backspace", "drop the last word of the name filter; with no filter, back to the tasks"},
 		{"s S", "sort by urgency, progress, open or last done"},
 		{"tab", "show or hide finished projects"},
 		{"p esc", "back to the tasks"},

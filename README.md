@@ -97,8 +97,10 @@ push the unfinished projects down.
 `/` filters the projects by name as you type. Every word must occur in the
 name, and case does not matter, so `ai gov` finds `ai-governance`. The header
 shows the count, such as `projects 3 of 45`, and how many finished projects
-also match. `esc` clears the filter, and a second `esc` leaves the view. The
-project filter is separate from the task filter, and it stays when you leave
+also match. The header shows each word in angle brackets, and `backspace`
+drops the last one, as in the task list, so `ai gov` becomes `ai`. With no
+filter, `backspace` goes back to the tasks. `esc` clears the whole filter, and
+a second `esc` leaves the view. The project filter is separate from the task filter, and it stays when you leave
 the view and come back.
 
 `enter` returns to the task list with the filter `project:name`, so the list
@@ -212,6 +214,8 @@ In the project view, the movement and page keys are the same as in the list.
 `enter` shows the project's tasks, `/` filters the projects by name, `s` and
 `S` change the order, `tab` shows or hides finished projects, and `r`
 reloads. `p` goes back to the list, and so does `esc` when no filter is set.
+`backspace` drops the last word of the name filter, and goes back when none is
+set.
 
 ## Environment
 
