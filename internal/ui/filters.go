@@ -7,30 +7,45 @@ import (
 )
 
 // filterChip is one filter that backspace can drop: the active filter, or one
-// word of the text filter.
+// word of a text filter.
 type filterChip struct {
 	label  string
 	active bool // the active-only filter, not a word of the text filter
-	word   int  // the index of the word in the text filter
 }
 
-// filterChips lists the filters in the order the header shows them: the
-// active filter, then each word of the text filter. The last one goes first.
+// wordChips makes a chip of each word of a filter.
+func wordChips(filter string) []filterChip {
+	var chips []filterChip
+	for _, word := range strings.Fields(filter) {
+		chips = append(chips, filterChip{label: word})
+	}
+	return chips
+}
+
+// dropLastWord is the filter without its last word.
+func dropLastWord(filter string) string {
+	words := strings.Fields(filter)
+	if len(words) == 0 {
+		return ""
+	}
+	return strings.Join(words[:len(words)-1], " ")
+}
+
+// filterChips lists the filters of the task list in the order the header
+// shows them: the active filter, then each word of the text filter. The last
+// one goes first.
 func (m Model) filterChips() []filterChip {
 	var chips []filterChip
 	if m.activeOnly {
 		chips = append(chips, filterChip{label: "▶ active only", active: true})
 	}
-	for i, word := range strings.Fields(m.filter) {
-		chips = append(chips, filterChip{label: word, word: i})
-	}
-	return chips
+	return append(chips, wordChips(m.filter)...)
 }
 
-// filterHeader draws each filter in angle brackets. The one that backspace
-// drops next is bold and underlined, and it carries the key.
-func (m Model) filterHeader() string {
-	chips := m.filterChips()
+// renderChips draws each filter in angle brackets. The one that backspace
+// drops next is bold and underlined, and it carries the key. Both the task
+// list and the project view use it, so the two look the same.
+func renderChips(chips []filterChip) string {
 	cells := make([]string, len(chips))
 	for i, c := range chips {
 		st := styleTag
@@ -46,20 +61,19 @@ func (m Model) filterHeader() string {
 	return strings.Join(cells, " ")
 }
 
-// dropFilter takes the last filter off, so each backspace widens the list by
-// one filter. The selection stays on the same task, found by UUID, when that
-// task is still in the list. With no filter set, it does nothing.
+// dropFilter takes the last filter off the task list, so each backspace
+// widens the list by one filter. The selection stays on the same task, found
+// by UUID, when that task is still in the list. With no filter set, it does
+// nothing.
 func (m Model) dropFilter() (tea.Model, tea.Cmd) {
 	chips := m.filterChips()
 	if len(chips) == 0 {
 		return m, nil
 	}
-	last := chips[len(chips)-1]
-	if last.active {
+	if chips[len(chips)-1].active {
 		m.activeOnly = false
 	} else {
-		words := strings.Fields(m.filter)
-		m.filter = strings.Join(words[:last.word], " ")
+		m.filter = dropLastWord(m.filter)
 	}
 	keep := ""
 	if t, ok := m.selected(); ok {
@@ -74,4 +88,12 @@ func (m Model) dropFilter() (tea.Model, tea.Cmd) {
 	}
 	m.clamp()
 	return m, nil
+}
+
+// dropProjectFilter takes the last word off the project name filter.
+// setProjects keeps the selection on the same project when it still matches.
+func (m Model) dropProjectFilter() Model {
+	m.pfilter = dropLastWord(m.pfilter)
+	m.setProjects(m.allProjects)
+	return m
 }

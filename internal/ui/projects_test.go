@@ -354,8 +354,9 @@ func TestProjectFilterNarrowsAsYouType(t *testing.T) {
 	if m.mode != modeProjects || m.pfilter != "ai gov" || names(m.projects) != "ai-governance" {
 		t.Fatalf("mode=%v filter=%q projects=%s", m.mode, m.pfilter, names(m.projects))
 	}
-	if !strings.Contains(m.View(), "filter ai gov") {
-		t.Errorf("header should show the filter")
+	header := strings.Split(m.View(), "\n")[0]
+	if !strings.Contains(header, "ai") || !strings.Contains(header, "gov") || !strings.Contains(header, "⌫") {
+		t.Errorf("header should show each word of the filter and the key: %q", header)
 	}
 }
 
