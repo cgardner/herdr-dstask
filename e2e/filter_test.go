@@ -1,5 +1,3 @@
-//go:build e2e
-
 package e2e
 
 import (
@@ -124,9 +122,7 @@ func TestFilterWithNoMatchShowsEveryTask(t *testing.T) {
 func TestActiveOnly(t *testing.T) {
 	t.Parallel()
 	w := newWorld(t, basic...)
-	if err := w.store().Start(1); err != nil {
-		t.Fatal(err)
-	}
+	w.seed("start", "1")
 	s := w.open()
 	s.press("A")
 	s.shows("write the plugin")
@@ -148,9 +144,7 @@ func TestActiveOnlyWithNoActiveTask(t *testing.T) {
 func TestBackspaceDropsOneFilterAtATime(t *testing.T) {
 	t.Parallel()
 	w := newWorld(t, basic...)
-	if err := w.store().Start(1); err != nil {
-		t.Fatal(err)
-	}
+	w.seed("start", "1")
 	s := w.open()
 	s.press("A")
 	s.filter("project:alpha plugin")
@@ -193,9 +187,7 @@ func TestBackspaceKeepsTheSelectedTask(t *testing.T) {
 func TestEscClearsMarksThenFiltersThenQuits(t *testing.T) {
 	t.Parallel()
 	w := newWorld(t, basic...)
-	if err := w.store().Start(1); err != nil {
-		t.Fatal(err)
-	}
+	w.seed("start", "1")
 	s := w.open()
 	s.press("A")
 	s.filter("plugin")
@@ -220,9 +212,7 @@ func TestEscClearsMarksThenFiltersThenQuits(t *testing.T) {
 func TestTabToResolvedClearsTheFilters(t *testing.T) {
 	t.Parallel()
 	w := newWorld(t, basic...)
-	if err := w.store().Done(3); err != nil {
-		t.Fatal(err)
-	}
+	w.seed("done", "3")
 	s := w.open()
 	s.filter("plugin")
 	s.shows("write the plugin")

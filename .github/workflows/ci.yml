@@ -23,6 +23,10 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
+          # e2e/ is a separate module with its own go.sum.
+          cache-dependency-path: |
+            go.sum
+            e2e/go.sum
       - run: make ci
 
   cross-build:

@@ -51,9 +51,16 @@ the TUI, set `DSTASK_GIT_REPO` to a scratch repository.
 and reads the screen through `charmbracelet/x/vt`. Each test has its own
 `world`: a task repository, a home and a state folder under `t.TempDir()`, and
 an environment with nothing from the real one but `PATH`. The tests press keys
-and read the screen. They import only `internal/store`, to make the starting
-tasks, so a refactor of `internal/ui` cannot change what they check. Keep it
-so: a test that reaches into the UI stops protecting a refactor.
+and read the screen.
+
+`e2e/` is its own Go module, with its own `go.mod`. Go picks one version of
+each module for a whole module, so test libraries in the plugin's module
+raised the versions the plugin is built with. Add a test library to
+`e2e/go.mod` only. The separate module also imports nothing from the plugin,
+so a refactor cannot change what the tests check. The starting tasks come from
+`tools/e2eseed`, which the suite builds and runs; it uses `internal/store`,
+which another module cannot import. A new kind of starting state is a new op
+in `tools/e2eseed`, not an import.
 
 - The emulator's `Read` carries its answers to terminal queries. `open` copies
   them back into the pseudo-terminal, as a real terminal does.
@@ -62,8 +69,9 @@ so: a test that reaches into the UI stops protecting a refactor.
 - `q` quits from the list and the project view only. In the task view it goes
   back, so a test leaves the task view before `quit`.
 - The help screen does not fit in the 20-row default, so its test uses 50.
-- `TestMain` sets `DSTASK_CONTEXT` once. `t.Setenv` would stop `t.Parallel`,
-  and the suite runs in about 12 seconds only because the tests are parallel.
+- Use no `t.Setenv`. It stops `t.Parallel`, and the suite runs in about 12
+  seconds only because the tests are parallel. Pass variables through
+  `world.env` instead.
 - A test for "nothing changed" calls `settle` first. It waits until the screen
   stops changing.
 

@@ -26,11 +26,12 @@ test: ## Run the test suite (it never touches ~/.dstask)
 COVER_PKGS := ./internal/...,.
 
 # The end-to-end tests build the binary, run it in a pseudo-terminal on a new
-# task repository, and read the screen through a terminal emulator. The e2e
-# build tag keeps them out of `make test` and out of the coverage numbers.
+# task repository, and read the screen through a terminal emulator. e2e/ is a
+# separate module, so `go test ./...` here skips it and its libraries do not
+# change the plugin's dependency versions.
 .PHONY: e2e
 e2e: ## Run the end-to-end tests: the real binary in a pseudo-terminal
-	@go test -tags e2e -count=1 ./e2e/...
+	@cd e2e && go test -count=1 ./...
 
 .PHONY: cover
 cover: ## Run tests and fail below COVER_MIN percent of statements
@@ -47,7 +48,7 @@ cover-html: cover ## Open the coverage report in a browser
 lint: ## Fail if anything is unformatted or vet reports a problem
 	@test -z "$$(gofmt -l .)" || { echo "gofmt needed:"; gofmt -l .; exit 1; }
 	@go vet ./...
-	@go vet -tags e2e ./e2e/...
+	@cd e2e && go vet ./...
 
 .PHONY: fmt
 fmt: ## Rewrite sources with gofmt
