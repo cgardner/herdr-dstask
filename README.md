@@ -267,7 +267,8 @@ first. `make help` lists every target. These are the most useful:
 
 | target | effect |
 |---|---|
-| `make ci` | lint, test, and fail below 90% coverage |
+| `make ci` | lint, test, fail below 90% coverage, and run the end-to-end tests |
+| `make e2e` | run the real binary in a pseudo-terminal and press keys as a user does |
 | `make run` | start the UI in the current terminal, outside Herdr |
 | `make list` | print the open tasks without the UI |
 | `make demo` | open the UI on invented tasks |

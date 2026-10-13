@@ -25,6 +25,13 @@ test: ## Run the test suite (it never touches ~/.dstask)
 # sibling package does not read as dead.
 COVER_PKGS := ./internal/...,.
 
+# The end-to-end tests build the binary, run it in a pseudo-terminal on a new
+# task repository, and read the screen through a terminal emulator. The e2e
+# build tag keeps them out of `make test` and out of the coverage numbers.
+.PHONY: e2e
+e2e: ## Run the end-to-end tests: the real binary in a pseudo-terminal
+	@go test -tags e2e -count=1 ./e2e/...
+
 .PHONY: cover
 cover: ## Run tests and fail below COVER_MIN percent of statements
 	@go test ./... -covermode=count -coverpkg=$(COVER_PKGS) -coverprofile=cover.out >/dev/null
@@ -40,13 +47,14 @@ cover-html: cover ## Open the coverage report in a browser
 lint: ## Fail if anything is unformatted or vet reports a problem
 	@test -z "$$(gofmt -l .)" || { echo "gofmt needed:"; gofmt -l .; exit 1; }
 	@go vet ./...
+	@go vet -tags e2e ./e2e/...
 
 .PHONY: fmt
 fmt: ## Rewrite sources with gofmt
 	@gofmt -w .
 
 .PHONY: ci
-ci: lint cover ## Everything CI would run
+ci: lint cover e2e ## Everything CI would run
 
 .PHONY: dist
 dist: ## Cross-compile a release binary for every platform
