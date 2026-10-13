@@ -8,7 +8,8 @@ import (
 	"testing"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/naggie/dstask"
 
 	"github.com/cgardner/herdr-dstask/internal/store"
@@ -101,29 +102,35 @@ func settle(t *testing.T, m Model, cmd tea.Cmd, depth int) Model {
 	return m
 }
 
-func key(s string) tea.KeyMsg {
+func key(s string) tea.KeyPressMsg {
 	switch s {
 	case "enter":
-		return tea.KeyMsg{Type: tea.KeyEnter}
+		return tea.KeyPressMsg{Code: tea.KeyEnter}
 	case "esc":
-		return tea.KeyMsg{Type: tea.KeyEsc}
+		return tea.KeyPressMsg{Code: tea.KeyEsc}
 	case "tab":
-		return tea.KeyMsg{Type: tea.KeyTab}
+		return tea.KeyPressMsg{Code: tea.KeyTab}
 	case "down":
-		return tea.KeyMsg{Type: tea.KeyDown}
+		return tea.KeyPressMsg{Code: tea.KeyDown}
 	case "backspace":
-		return tea.KeyMsg{Type: tea.KeyBackspace}
+		return tea.KeyPressMsg{Code: tea.KeyBackspace}
+	case "ctrl+c":
+		return tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl}
 	}
-	return tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(s)}
+	return tea.KeyPressMsg{Code: []rune(s)[0], Text: s}
 }
 
 func typed(s string) []tea.Msg {
 	var msgs []tea.Msg
 	for _, r := range s {
-		msgs = append(msgs, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+		msgs = append(msgs, tea.KeyPressMsg{Code: r, Text: string(r)})
 	}
 	return msgs
 }
+
+// screen is the view as plain text. Lip Gloss v2 always writes the color
+// codes, so a test that looks for text strips them first.
+func screen(m Model) string { return ansi.Strip(m.render()) }
 
 func start(t *testing.T, f *fake) Model {
 	t.Helper()
@@ -138,7 +145,7 @@ func TestLoadListsTasksAndContext(t *testing.T) {
 	if len(m.visible) != 3 || m.context != "+work" {
 		t.Fatalf("visible=%d context=%q", len(m.visible), m.context)
 	}
-	view := m.View()
+	view := screen(m)
 	for _, want := range []string{"write the plugin", "review the docs", "+work", "open 3"} {
 		if !strings.Contains(view, want) {
 			t.Errorf("view lacks %q", want)
@@ -188,7 +195,7 @@ func TestModifyPromptSendsInput(t *testing.T) {
 	if len(f.calls) != 1 || f.calls[0] != "modify 3 +urgent P0" {
 		t.Errorf("calls = %v", f.calls)
 	}
-	if !strings.Contains(m.View(), "modified #3") {
+	if !strings.Contains(screen(m), "modified #3") {
 		t.Errorf("status line missing from view")
 	}
 }
@@ -232,7 +239,7 @@ func TestContextToggle(t *testing.T) {
 	f := &fake{open: tasks()}
 	m := start(t, f)
 	m = drive(t, m, key("c"))
-	if !f.ignore || !strings.Contains(m.View(), "context ignored") {
+	if !f.ignore || !strings.Contains(screen(m), "context ignored") {
 		t.Errorf("c should ignore the context")
 	}
 }
@@ -241,7 +248,7 @@ func TestErrorsReachTheStatusLine(t *testing.T) {
 	f := &fake{open: tasks(), fail: errors.New("refusing to resolve task with incomplete tasklist")}
 	m := start(t, f)
 	m = drive(t, m, key("d"))
-	if !m.statusErr || !strings.Contains(m.View(), "incomplete tasklist") {
+	if !m.statusErr || !strings.Contains(screen(m), "incomplete tasklist") {
 		t.Errorf("error not shown: %q", m.status)
 	}
 }
@@ -264,7 +271,7 @@ func TestDetailShowsNotesAndActsOnTheTask(t *testing.T) {
 	if m.mode != modeDetail {
 		t.Fatal("enter should open the detail view")
 	}
-	view := m.View()
+	view := screen(m)
 	for _, want := range []string{"#7 review the docs", "check the manifest", "active"} {
 		if !strings.Contains(view, want) {
 			t.Errorf("detail lacks %q", want)
@@ -291,7 +298,7 @@ func TestEditorErrorsAreReported(t *testing.T) {
 func TestNarrowPaneDoesNotOverflow(t *testing.T) {
 	m := start(t, &fake{open: tasks()})
 	m = drive(t, m, tea.WindowSizeMsg{Width: 30, Height: 8})
-	for i, line := range strings.Split(m.View(), "\n") {
+	for i, line := range strings.Split(screen(m), "\n") {
 		if w := len([]rune(stripSGR(line))); w > 30 {
 			t.Errorf("line %d is %d wide: %q", i, w, line)
 		}
@@ -320,7 +327,7 @@ func TestActiveFilterShowsOnlyStartedTasks(t *testing.T) {
 	if len(m.visible) != 1 || m.visible[0].ID != 7 {
 		t.Fatalf("visible = %+v, want only #7", m.visible)
 	}
-	if !strings.Contains(m.View(), "active only") {
+	if !strings.Contains(screen(m), "active only") {
 		t.Errorf("header should name the active filter")
 	}
 	m = drive(t, m, key("A"))
@@ -333,7 +340,7 @@ func TestActiveFilterCombinesWithTextFilter(t *testing.T) {
 	m := start(t, &fake{open: tasks()})
 	m = drive(t, m, key("A"), key("/"))
 	m = drive(t, m, append(typed("garage"), key("enter"))...)
-	if !m.fallback || len(m.visible) != 3 || !strings.Contains(m.View(), "no task matches") {
+	if !m.fallback || len(m.visible) != 3 || !strings.Contains(screen(m), "no task matches") {
 		t.Fatalf("no active task matches, so every task shows with a notice: %+v", m.visible)
 	}
 	// esc clears the text filter first and keeps the active filter.
@@ -363,7 +370,7 @@ func TestActiveFilterEmptyMessage(t *testing.T) {
 	open[1].Status = "pending"
 	m := start(t, &fake{open: open})
 	m = drive(t, m, key("A"))
-	if !m.fallback || !strings.Contains(m.View(), "no active tasks") || len(m.visible) != len(open) {
+	if !m.fallback || !strings.Contains(screen(m), "no active tasks") || len(m.visible) != len(open) {
 		t.Errorf("empty active list should say so and show every task")
 	}
 }
@@ -452,7 +459,7 @@ func TestNoMatchShowsAllTasksWithNotice(t *testing.T) {
 	m := start(t, &fake{open: tasks()})
 	m = drive(t, m, key("/"))
 	m = drive(t, m, append(typed("zzzz"), key("enter"))...)
-	view := m.View()
+	view := screen(m)
 	if !m.fallback || len(m.visible) != len(tasks()) {
 		t.Fatalf("fallback=%v visible=%d", m.fallback, len(m.visible))
 	}

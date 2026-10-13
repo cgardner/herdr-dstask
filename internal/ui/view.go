@@ -3,10 +3,12 @@ package ui
 import (
 	"fmt"
 	"hash/fnv"
+	"image/color"
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/naggie/dstask"
 )
@@ -36,7 +38,9 @@ var (
 // the green, yellow, blue and cyan that carry other meanings, in a theme
 // whose bright colors differ. Catppuccin makes them the same, so there two
 // tags can share a color, and a tag can look like a project.
-var tagPalette = []lipgloss.Color{"10", "11", "12", "13", "14"}
+var tagPalette = []color.Color{
+	lipgloss.Color("10"), lipgloss.Color("11"), lipgloss.Color("12"), lipgloss.Color("13"), lipgloss.Color("14"),
+}
 
 // maxTagWidth caps the TAGS column, so a long tag cannot push the summary off
 // the row.
@@ -50,8 +54,16 @@ func tagStyle(tag string) lipgloss.Style {
 	return lipgloss.NewStyle().Foreground(tagPalette[h.Sum32()%uint32(len(tagPalette))])
 }
 
-// View renders the current mode.
-func (m Model) View() string {
+// View renders the current mode on the alternate screen, which Bubble Tea v2
+// sets from the view rather than from a program option.
+func (m Model) View() tea.View {
+	v := tea.NewView(m.render())
+	v.AltScreen = true
+	return v
+}
+
+// render draws the current mode as text.
+func (m Model) render() string {
 	switch m.mode {
 	case modeHelp:
 		return m.viewHelp()
@@ -415,7 +427,7 @@ func (m Model) viewDetail() string {
 		title = " " + t.Summary
 	}
 	pct := ""
-	if m.detail.TotalLineCount() > m.detail.Height {
+	if m.detail.TotalLineCount() > m.detail.Height() {
 		pct = styleDim.Render(fmt.Sprintf(" %3.0f%%", m.detail.ScrollPercent()*100))
 	}
 	return fit(styleTitle.Render(title), m.width-5) + pct + "\n" +

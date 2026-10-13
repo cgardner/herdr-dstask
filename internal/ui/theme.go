@@ -1,11 +1,12 @@
 package ui
 
 import (
+	"image/color"
 	"os"
 	"regexp"
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 )
 
 // The selection matches herdr-switcher-plus, which matches Herdr's own
@@ -24,7 +25,7 @@ var hexColor = regexp.MustCompile(`^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$`)
 // catppuccin default. Herdr exposes no API for the palette of a named theme,
 // so those two are the only ways to follow a different theme. A malformed
 // value falls back rather than rendering a broken escape sequence.
-func selectionBackground() lipgloss.Color {
+func selectionBackground() color.Color {
 	if v := strings.TrimSpace(os.Getenv(selectionBgEnv)); hexColor.MatchString(v) {
 		return lipgloss.Color(v)
 	}

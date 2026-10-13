@@ -80,12 +80,12 @@ func TestBackspaceInThePromptEditsTheText(t *testing.T) {
 
 func TestHeaderShowsEachFilterAndTheKey(t *testing.T) {
 	m := start(t, &fake{open: tasks()})
-	if strings.Contains(m.View(), "⌫") {
+	if strings.Contains(screen(m), "⌫") {
 		t.Errorf("no filter, no hint")
 	}
 	m = drive(t, m, key("A"), key("/"))
 	m = drive(t, m, append(typed("project:herdr docs"), key("enter"))...)
-	header := strings.Split(m.View(), "\n")[0]
+	header := strings.Split(screen(m), "\n")[0]
 	for _, want := range []string{"▶ active only", "project:herdr", "docs", "⌫"} {
 		if !strings.Contains(header, want) {
 			t.Errorf("header lacks %q: %q", want, header)
@@ -100,7 +100,7 @@ func TestBackspaceDropsTheLastProjectFilterWord(t *testing.T) {
 	m := startProjects(t, &fake{open: tasks(), projects: filterProjects()})
 	m = drive(t, m, key("/"))
 	m = drive(t, m, append(typed("ai gov"), key("enter"))...)
-	header := strings.Split(m.View(), "\n")[0]
+	header := strings.Split(screen(m), "\n")[0]
 	if strings.Count(header, "⌫") != 1 || strings.Index(header, "⌫") < strings.Index(header, "gov") {
 		t.Errorf("the last word carries the key: %q", header)
 	}

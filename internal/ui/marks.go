@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sort"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/naggie/dstask"
 
 	"github.com/cgardner/herdr-dstask/internal/store"
