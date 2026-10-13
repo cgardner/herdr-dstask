@@ -479,6 +479,8 @@ func (m Model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.cursor, m.offset = 0, 0
 		m.loading = true
 		return m, m.load()
+	case "backspace":
+		return m.dropFilter()
 	case "c":
 		m.ignoreContext = !m.ignoreContext
 		m.backend.SetIgnoreContext(m.ignoreContext)

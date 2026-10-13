@@ -134,9 +134,6 @@ func (m Model) header() string {
 	case m.context != "":
 		parts = append(parts, "context "+styleProject.Render(m.context))
 	}
-	if m.activeOnly {
-		parts = append(parts, styleActive.Render("▶ active only"))
-	}
 	if n := len(m.marked); n > 0 {
 		marked := styleKey.Render(fmt.Sprintf("%d marked", n))
 		if h := m.hiddenMarks(); h > 0 {
@@ -144,8 +141,8 @@ func (m Model) header() string {
 		}
 		parts = append(parts, marked)
 	}
-	if m.filter != "" {
-		parts = append(parts, "filter "+styleTag.Render(m.filter))
+	if chips := m.filterHeader(); chips != "" {
+		parts = append(parts, chips)
 	}
 	if m.loading {
 		parts = append(parts, styleDim.Render("…"))
@@ -483,6 +480,7 @@ func (m Model) viewHelp() string {
 		{"/", "filter by words, or project:name for one project"},
 		{"#", "find by id: #72, or #72 #29 for several"},
 		{"A", "show only active tasks, or all tasks again"},
+		{"backspace", "drop the last filter: the last word of the text filter, then the active filter"},
 		{"space", "mark the task and move down; d s m n x then change every marked task"},
 		{"*", "mark every task shown, or unmark them all"},
 		{"tab", "switch between open and resolved tasks"},
