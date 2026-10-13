@@ -1,5 +1,3 @@
-//go:build e2e
-
 package e2e
 
 import (
@@ -116,9 +114,7 @@ func TestUndoTheLastChange(t *testing.T) {
 func TestResolvedTasksRefuseChanges(t *testing.T) {
 	t.Parallel()
 	w := newWorld(t, basic...)
-	if err := w.store().Done(3); err != nil {
-		t.Fatal(err)
-	}
+	w.seed("done", "3")
 	s := w.open()
 	s.press("tab")
 	s.waitHeader("resolved 1")

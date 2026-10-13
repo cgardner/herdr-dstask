@@ -1,5 +1,3 @@
-//go:build e2e
-
 package e2e
 
 import (
@@ -18,11 +16,7 @@ func projectWorld(t *testing.T) *world {
 		"P3 project:beta beta one",     // 4
 		"P2 project:gamma gamma one",   // 5
 	)
-	for _, id := range []int{3, 5} {
-		if err := w.store().Done(id); err != nil {
-			t.Fatal(err)
-		}
-	}
+	w.seed("done", "3", "done", "5")
 	return w
 }
 

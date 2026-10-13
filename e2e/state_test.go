@@ -1,5 +1,3 @@
-//go:build e2e
-
 package e2e
 
 import (
@@ -25,9 +23,7 @@ func TestReopenRestoresTheFilter(t *testing.T) {
 func TestReopenRestoresTheResolvedList(t *testing.T) {
 	t.Parallel()
 	w := newWorld(t, basic...)
-	if err := w.store().Done(3); err != nil {
-		t.Fatal(err)
-	}
+	w.seed("done", "3")
 	s := w.open()
 	s.press("tab")
 	s.waitHeader("resolved 1")
@@ -62,9 +58,7 @@ func TestReopenRestoresTheSelectedTask(t *testing.T) {
 	s.waitSelected("tidy the garage")
 	s.quit()
 
-	if err := w.store().Add("P0 a new first task"); err != nil {
-		t.Fatal(err)
-	}
+	w.seed("add", "P0 a new first task")
 	s = w.open()
 	s.waitFor("a new first task")
 	s.waitSelected("tidy the garage")

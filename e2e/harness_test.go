@@ -1,11 +1,10 @@
-//go:build e2e
-
 // Package e2e runs the built plugin binary in a pseudo-terminal, against a
 // new dstask repository in a temporary directory, and reads the screen back
 // through a terminal emulator. The tests press keys as a user does and check
-// the screen and the repository. They use no package of the plugin except
-// the store, and only to make the starting tasks, so a refactor of the UI
-// cannot change what they test.
+// the screen and the repository. This is a separate module that imports
+// nothing from the plugin, so a refactor cannot change what the tests check,
+// and the test libraries cannot change the versions the plugin is built with.
+// The starting tasks come from tools/e2eseed, which uses the plugin's store.
 package e2e
 
 import (
@@ -21,12 +20,11 @@ import (
 
 	"github.com/charmbracelet/x/vt"
 	"github.com/creack/pty"
-
-	"github.com/cgardner/herdr-dstask/internal/store"
 )
 
-// binary is the plugin, built once for the whole run.
-var binary string
+// binary is the plugin and seed is tools/e2eseed, both built once for the
+// whole run from the plugin's module, the parent folder.
+var binary, seed string
 
 func TestMain(m *testing.M) {
 	dir, err := os.MkdirTemp("", "herdr-dstask-e2e")
@@ -34,14 +32,14 @@ func TestMain(m *testing.M) {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	// The store reads DSTASK_CONTEXT when a test makes its tasks. It is set
-	// once here, not with t.Setenv, so the tests can run in parallel.
-	os.Setenv("DSTASK_CONTEXT", "")
-	binary = filepath.Join(dir, "herdr-dstask")
-	build := exec.Command("go", "build", "-o", binary, "..")
-	if out, err := build.CombinedOutput(); err != nil {
-		fmt.Fprintf(os.Stderr, "build: %v\n%s", err, out)
-		os.Exit(1)
+	binary, seed = filepath.Join(dir, "herdr-dstask"), filepath.Join(dir, "e2eseed")
+	for out, pkg := range map[string]string{binary: ".", seed: "./tools/e2eseed"} {
+		build := exec.Command("go", "build", "-o", out, pkg)
+		build.Dir = ".."
+		if b, err := build.CombinedOutput(); err != nil {
+			fmt.Fprintf(os.Stderr, "build %s: %v\n%s", pkg, err, b)
+			os.Exit(1)
+		}
 	}
 	code := m.Run()
 	os.RemoveAll(dir)
@@ -76,16 +74,27 @@ func newWorld(t *testing.T, tasks ...string) *world {
 	w.git("config", "user.email", "e2e@example.com")
 	w.git("config", "user.name", "e2e")
 	w.git("config", "commit.gpgsign", "false")
-	s := w.store()
+	var ops []string
 	for _, task := range tasks {
-		if err := s.Add(task); err != nil {
-			t.Fatalf("add %q: %v", task, err)
-		}
+		ops = append(ops, "add", task)
 	}
+	w.seed(ops...)
 	return w
 }
 
-func (w *world) store() *store.Store { return store.NewAt(w.repo) }
+// seed runs tools/e2eseed on the repository: pairs of an op and its
+// argument, such as "add", "P1 a task" or "done", "3".
+func (w *world) seed(ops ...string) {
+	w.t.Helper()
+	if len(ops) == 0 {
+		return
+	}
+	cmd := exec.Command(seed, append([]string{w.repo}, ops...)...)
+	cmd.Env = append(os.Environ(), "DSTASK_CONTEXT=")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		w.t.Fatalf("seed %q: %v: %s", ops, err, out)
+	}
+}
 
 func (w *world) git(args ...string) string {
 	w.t.Helper()
