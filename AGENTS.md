@@ -80,6 +80,14 @@ The priority column is a one-column dot: `●` for P0 and P1, `○` for P2, `·`
 for P3, colored by priority. Do not use emoji. They carry their own colors,
 which ignore the theme.
 
+A tag gets its color from a hash of its name, so it has the same color in
+the list and in the task view. `tagPalette` holds only the bright indexes 10
+to 14. Red never marks a tag, because red means critical, late or an error.
+Catppuccin Mocha, Herdr's default, makes each bright color the same as its
+normal color, so a tag there can share a color with a project or an active
+task. The TAGS column keeps them apart by position. dstask sorts tags by
+name, so the column shows the first tag by name, not the first tag typed.
+
 ## Releasing
 
 The setup is the same as in herdr-switcher-plus. A conventional commit on

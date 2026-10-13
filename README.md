@@ -41,8 +41,12 @@ description = "dstask tasks"
 
 ## The list
 
-Each row shows the ID, a priority dot, a status mark, the project, the
-summary, the due date and the tags.
+Each row shows the ID, a priority dot, a status mark, the project, the tags,
+the summary and the due date.
+
+The TAGS column shows the first tag by name. When a task has more tags, a dim
+`+N` gives the count of the others, and the task view lists all of them. Each
+tag has a color of its own, the same in the list and in the task view.
 
 | mark | meaning |
 |---|---|

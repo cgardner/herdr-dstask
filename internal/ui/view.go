@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"hash/fnv"
 	"strings"
 	"time"
 
@@ -30,6 +31,25 @@ var (
 	styleBarDone  = lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
 )
 
+// tagPalette gives each tag a color of its own. Red is left out, because it
+// means critical, late or an error. The bright indexes keep tags apart from
+// the green, yellow, blue and cyan that carry other meanings, in a theme
+// whose bright colors differ. Catppuccin makes them the same, so there two
+// tags can share a color, and a tag can look like a project.
+var tagPalette = []lipgloss.Color{"10", "11", "12", "13", "14"}
+
+// maxTagWidth caps the TAGS column, so a long tag cannot push the summary off
+// the row.
+const maxTagWidth = 14
+
+// tagStyle is the color of a tag: a hash of its name, so a tag has the same
+// color in every row, in the task view and in every session.
+func tagStyle(tag string) lipgloss.Style {
+	h := fnv.New32a()
+	h.Write([]byte(tag))
+	return lipgloss.NewStyle().Foreground(tagPalette[h.Sum32()%uint32(len(tagPalette))])
+}
+
 // View renders the current mode.
 func (m Model) View() string {
 	switch m.mode {
@@ -54,7 +74,8 @@ func (m Model) viewList() string {
 	var b strings.Builder
 	b.WriteString(m.header())
 	b.WriteByte('\n')
-	b.WriteString(styleDim.Render(fit(fmt.Sprintf("  %*s %-1s %-1s %-16s %s", m.idWidth(), "ID", "", "", "PROJECT", "SUMMARY"), m.width)))
+	heading := fmt.Sprintf("  %*s %-1s %-1s %-16s %-*s %s", m.idWidth(), "ID", "", "", "PROJECT", m.tagWidth(), "TAGS", "SUMMARY")
+	b.WriteString(styleDim.Render(fit(heading, m.width)))
 	b.WriteByte('\n')
 
 	rows := m.listRows()
@@ -168,14 +189,59 @@ func (m Model) row(t dstask.Task, selected bool) string {
 		seg(priorityStyle(t.Priority), priorityMark(t.Priority)) + sp +
 		seg(glyphStyle, glyph) + sp +
 		seg(styleProject, fmt.Sprintf("%-16s", ansi.Truncate(t.Project, 16, "…"))) + sp +
+		m.tagCell(t, base) + sp +
 		seg(summaryStyle(t), t.Summary)
 	if due, st := m.due(t); due != "" {
 		line += sp + seg(st, due)
 	}
-	for _, tag := range t.Tags {
-		line += sp + seg(styleTag, "+"+tag)
-	}
 	return fill(line, m.width, base)
+}
+
+// tagWidth is the width of the TAGS column: the widest first tag with its
+// "+N", capped at maxTagWidth. It follows every loaded task, as idWidth does,
+// so the column does not move while a filter narrows the list.
+func (m Model) tagWidth() int {
+	w := len("TAGS")
+	for _, t := range m.all {
+		if len(t.Tags) > 0 {
+			w = max(w, ansi.StringWidth(t.Tags[0])+len(moreTags(t)))
+		}
+	}
+	return min(w, maxTagWidth)
+}
+
+// moreTags is " +N" for the tags after the first, which the row has no room
+// for. The task view lists them all.
+func moreTags(t dstask.Task) string {
+	if len(t.Tags) < 2 {
+		return ""
+	}
+	return fmt.Sprintf(" +%d", len(t.Tags)-1)
+}
+
+// tagCell is the first tag in its color and a dim "+N" for the rest, padded
+// to the column. dstask keeps tags in alphabetical order, so the first tag is
+// the first by name.
+func (m Model) tagCell(t dstask.Task, base lipgloss.Style) string {
+	w := m.tagWidth()
+	if len(t.Tags) == 0 {
+		return base.Render(strings.Repeat(" ", w))
+	}
+	more := moreTags(t)
+	first := ansi.Truncate(t.Tags[0], w-len(more), "…")
+	pad := w - ansi.StringWidth(first) - len(more)
+	return tagStyle(t.Tags[0]).Inherit(base).Render(first) +
+		styleDim.Inherit(base).Render(more) +
+		base.Render(strings.Repeat(" ", pad))
+}
+
+// tagList is every tag in the color the list gives it, for the task view.
+func tagList(tags []string) string {
+	out := make([]string, len(tags))
+	for i, tag := range tags {
+		out[i] = tagStyle(tag).Render(tag)
+	}
+	return strings.Join(out, styleDim.Render(" · "))
 }
 
 // idWidth is the length of the longest ID in the loaded list, and never less
@@ -372,11 +438,7 @@ func (m Model) detailBody(t dstask.Task) string {
 		b.WriteString(field("project", styleProject.Render(t.Project)))
 	}
 	if len(t.Tags) > 0 {
-		tags := make([]string, len(t.Tags))
-		for i, tag := range t.Tags {
-			tags[i] = styleTag.Render("+" + tag)
-		}
-		b.WriteString(field("tags", strings.Join(tags, " ")))
+		b.WriteString(field("tags", tagList(t.Tags)))
 	}
 	if due := m.dueLabel(t); due != "" {
 		b.WriteString(field("due", due))

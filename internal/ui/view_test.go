@@ -9,6 +9,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/naggie/dstask"
 )
 
@@ -147,7 +148,7 @@ func TestDetailBodyShowsEveryField(t *testing.T) {
 		Notes:    "line one\nline two",
 	}
 	body := m.detailBody(task)
-	for _, want := range []string{"resolved", "P0", "+a", "+b", "due", "3d ago", "5h ago", "u-1", "line two"} {
+	for _, want := range []string{"resolved", "P0", "a · b", "due", "3d ago", "5h ago", "u-1", "line two"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("body lacks %q", want)
 		}
@@ -323,6 +324,9 @@ func TestColorsArePaletteIndexes(t *testing.T) {
 		"critical": styleCritical, "high": styleHigh, "active": styleActive, "paused": stylePaused,
 		"project": styleProject, "tag": styleTag, "overdue": styleOverdue, "error": styleError,
 		"ok": styleOK, "key": styleKey,
+	}
+	for _, c := range tagPalette {
+		styles["tag "+string(c)] = lipgloss.NewStyle().Foreground(c)
 	}
 	for name, st := range styles {
 		c, ok := st.GetForeground().(lipgloss.Color)
@@ -523,5 +527,54 @@ func TestFilterReturnsToTheFirstPage(t *testing.T) {
 	m = drive(t, m, typed("task 3")...)
 	if m.offset != 0 || m.cursor != 0 {
 		t.Errorf("filtering should start at the first page: cursor=%d offset=%d", m.cursor, m.offset)
+	}
+}
+
+// The TAGS column shows the first tag and a count of the rest, and every row
+// starts its summary in the same column, with or without tags.
+func TestTagColumn(t *testing.T) {
+	open := tasks()
+	open[0].Tags = []string{"backend", "performance"}
+	open[1].Tags = nil
+	open[2].Tags = []string{"a-very-long-tag-name"}
+	m := start(t, &fake{open: open})
+	lines := strings.Split(m.View(), "\n")
+	heading := lines[1]
+	col := strings.Index(heading, "SUMMARY")
+	if tags := strings.Index(heading, "TAGS"); tags < 0 || tags > col {
+		t.Fatalf("TAGS must come before SUMMARY: %q", heading)
+	}
+	for i, task := range open {
+		row := lines[2+i]
+		if got := ansi.StringWidth(row[:strings.Index(row, task.Summary)]); got != col {
+			t.Errorf("row %d: summary at %d, want %d: %q", i, got, col, row)
+		}
+	}
+	if !strings.Contains(lines[2], "backend +1") || strings.Contains(lines[2], "performance") {
+		t.Errorf("the row shows the first tag and a count: %q", lines[2])
+	}
+	if !strings.Contains(lines[4], "a-very-long-t…") {
+		t.Errorf("a long tag is cut at the column width: %q", lines[4])
+	}
+	if strings.Contains(m.View(), "+backend") {
+		t.Errorf("the column needs no + before a tag")
+	}
+}
+
+// A tag keeps its color everywhere, and the color never comes from red.
+func TestTagColorIsStable(t *testing.T) {
+	if tagStyle("backend").GetForeground() != tagStyle("backend").GetForeground() {
+		t.Errorf("one tag must always get one color")
+	}
+	seen := map[lipgloss.TerminalColor]bool{}
+	for _, tag := range []string{"backend", "docs", "home", "infra", "release", "review", "someday"} {
+		c := tagStyle(tag).GetForeground()
+		if c == lipgloss.Color("1") || c == lipgloss.Color("9") {
+			t.Errorf("%s: red is for alarms, not tags", tag)
+		}
+		seen[c] = true
+	}
+	if len(seen) < 2 {
+		t.Errorf("different tags should spread over the palette")
 	}
 }
