@@ -158,7 +158,8 @@ In the filter, `project:atlas` matches the tasks of that project, and
 `#72 #29` matches either task.
 Other words then narrow the result. A number without `#` is a text search, so
 a ticket number such as `3995` in a summary can still be found. `A` and `/`
-work together.
+work together. When the filters match no task, the list shows every task, and
+a line at the top of the list says so.
 
 These change a task, in the list and in the task view:
 

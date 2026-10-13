@@ -85,6 +85,10 @@ type Model struct {
 	visible []dstask.Task
 	filter  string
 
+	// fallback is true when the filters match no task, so the list shows every
+	// task and the view says so at the top.
+	fallback bool
+
 	// activeOnly narrows the open list to started tasks. It works with the
 	// text filter, not in place of it.
 	activeOnly bool
@@ -288,8 +292,12 @@ func (m *Model) setTasks(tasks []dstask.Task) {
 	}
 }
 
+// applyFilter narrows the list to the tasks that the filters match. When no
+// task matches, it shows every task and sets fallback, so the list is never
+// empty while tasks exist.
 func (m *Model) applyFilter() {
 	m.visible = m.visible[:0:0]
+	m.fallback = false
 	for _, t := range m.all {
 		if m.activeOnly && t.Status != dstask.STATUS_ACTIVE {
 			continue
@@ -297,6 +305,10 @@ func (m *Model) applyFilter() {
 		if m.filter == "" || matches(t, m.filter) {
 			m.visible = append(m.visible, t)
 		}
+	}
+	if len(m.visible) == 0 && len(m.all) > 0 && (m.filter != "" || m.activeOnly) {
+		m.fallback = true
+		m.visible = append(m.visible, m.all...)
 	}
 	m.clamp()
 }
@@ -366,6 +378,9 @@ func (m Model) listRows() int {
 	rows := max(1, m.height-4)
 	if len(m.visible) > rows {
 		rows = max(1, m.height-5)
+	}
+	if m.fallback {
+		rows = max(1, rows-1)
 	}
 	return rows
 }

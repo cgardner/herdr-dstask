@@ -331,8 +331,8 @@ func TestActiveFilterCombinesWithTextFilter(t *testing.T) {
 	m := start(t, &fake{open: tasks()})
 	m = drive(t, m, key("A"), key("/"))
 	m = drive(t, m, append(typed("garage"), key("enter"))...)
-	if len(m.visible) != 0 || !strings.Contains(m.View(), "no task matches") {
-		t.Fatalf("paused #9 must stay hidden: %+v", m.visible)
+	if !m.fallback || len(m.visible) != 3 || !strings.Contains(m.View(), "no task matches") {
+		t.Fatalf("no active task matches, so every task shows with a notice: %+v", m.visible)
 	}
 	// esc clears the text filter first and keeps the active filter.
 	m = drive(t, m, key("esc"))
@@ -361,8 +361,8 @@ func TestActiveFilterEmptyMessage(t *testing.T) {
 	open[1].Status = "pending"
 	m := start(t, &fake{open: open})
 	m = drive(t, m, key("A"))
-	if !strings.Contains(m.View(), "no active tasks") {
-		t.Errorf("empty active list should say so")
+	if !m.fallback || !strings.Contains(m.View(), "no active tasks") || len(m.visible) != len(open) {
+		t.Errorf("empty active list should say so and show every task")
 	}
 }
 
@@ -444,4 +444,22 @@ func (f *fake) ModifyAll(r []store.Ref, s string) error {
 }
 func (f *fake) NoteAll(r []store.Ref, s string) error {
 	return f.record(fmt.Sprintf("note %s %s", ids(r), s))
+}
+
+func TestNoMatchShowsAllTasksWithNotice(t *testing.T) {
+	m := start(t, &fake{open: tasks()})
+	m = drive(t, m, key("/"))
+	m = drive(t, m, append(typed("zzzz"), key("enter"))...)
+	view := m.View()
+	if !m.fallback || len(m.visible) != len(tasks()) {
+		t.Fatalf("fallback=%v visible=%d", m.fallback, len(m.visible))
+	}
+	lines := strings.Split(view, "\n")
+	if !strings.Contains(lines[2], "no task matches") || !strings.Contains(lines[2], "showing all tasks") {
+		t.Errorf("the notice must sit at the top of the list: %q", lines[2])
+	}
+	m = drive(t, m, key("esc"))
+	if m.fallback {
+		t.Errorf("clearing the filter must clear the notice")
+	}
 }
