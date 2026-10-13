@@ -147,6 +147,7 @@ In the list:
 | `/` | filter by words in the summary, project, tags or notes |
 | `#` | find by ID: opens the filter with `#` typed |
 | `A` | show only active tasks; press again to show all |
+| `backspace` | drop the last filter, one at a time |
 | `space` | mark the task and move down |
 | `*` | mark every task shown, or unmark them all |
 | `tab` | switch between open and resolved tasks |
@@ -162,7 +163,11 @@ In the filter, `project:atlas` matches the tasks of that project, and
 `#72 #29` matches either task.
 Other words then narrow the result. A number without `#` is a text search, so
 a ticket number such as `3995` in a summary can still be found. `A` and `/`
-work together. When the filters match no task, the list shows every task, and
+work together. The header shows each filter in angle brackets. `backspace`
+drops the last one, which is bold and underlined with a `⌫`: first the last
+word of the text filter, then the active filter. The selected task stays
+selected when it is still in the list. `esc` clears a whole filter at once.
+When the filters match no task, the list shows every task, and
 a line at the top of the list says so.
 
 These change a task, in the list and in the task view:
