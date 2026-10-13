@@ -3,12 +3,13 @@ package ui
 import (
 	"errors"
 	"fmt"
+	"image/color"
 	"strings"
 	"testing"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/naggie/dstask"
 )
@@ -18,11 +19,11 @@ var testNow = time.Date(2026, 9, 25, 12, 0, 0, 0, time.UTC)
 func TestHelpOpensAndAnyKeyCloses(t *testing.T) {
 	m := start(t, &fake{open: tasks()})
 	m = drive(t, m, key("?"))
-	if m.mode != modeHelp || !strings.Contains(m.View(), "dstask keys") {
+	if m.mode != modeHelp || !strings.Contains(screen(m), "dstask keys") {
 		t.Fatalf("mode=%v", m.mode)
 	}
 	for _, want := range []string{"show only active tasks", "undo the last change"} {
-		if !strings.Contains(m.View(), want) {
+		if !strings.Contains(screen(m), want) {
 			t.Errorf("help lacks %q", want)
 		}
 	}
@@ -41,7 +42,7 @@ func TestPromptLineNamesTheTarget(t *testing.T) {
 	m := start(t, &fake{open: tasks()})
 	for k, want := range map[string]string{"m": "modify #3", "n": "note #3", "a": "add", "/": "filter"} {
 		mm := drive(t, m, key(k))
-		if !strings.Contains(mm.View(), want) {
+		if !strings.Contains(screen(mm), want) {
 			t.Errorf("%s: prompt lacks %q", k, want)
 		}
 	}
@@ -88,14 +89,14 @@ func TestDetailKeys(t *testing.T) {
 	if m.mode != modePrompt || m.back != modeDetail {
 		t.Fatalf("a in the detail view should open the add prompt")
 	}
-	if !strings.Contains(m.View(), "#3 write the plugin") {
+	if !strings.Contains(screen(m), "#3 write the plugin") {
 		t.Errorf("the detail view should stay behind the prompt")
 	}
 	m = drive(t, m, key("esc"), key("h"))
 	if m.mode != modeList {
 		t.Errorf("h should return to the list")
 	}
-	if _, cmd := drive(t, m, key("enter")).Update(tea.KeyMsg{Type: tea.KeyCtrlC}); cmd == nil {
+	if _, cmd := drive(t, m, key("enter")).Update(key("ctrl+c")); cmd == nil {
 		t.Errorf("ctrl+c in the detail view should quit")
 	}
 }
@@ -104,7 +105,7 @@ func TestRemoveFromDetailReturnsToTheList(t *testing.T) {
 	f := &fake{open: tasks()}
 	m := start(t, f)
 	m = drive(t, m, key("enter"), key("x"))
-	if !strings.Contains(m.View(), "remove #3") {
+	if !strings.Contains(screen(m), "remove #3") {
 		t.Fatalf("confirm line missing")
 	}
 	m = drive(t, m, key("y"))
@@ -131,7 +132,7 @@ func TestDetailFollowsAChangedTask(t *testing.T) {
 	f.open = tasks()
 	f.open[0].Summary = "renamed"
 	m = drive(t, m, key("d"))
-	if m.mode != modeDetail || !strings.Contains(m.View(), "renamed") {
+	if m.mode != modeDetail || !strings.Contains(screen(m), "renamed") {
 		t.Errorf("the detail view should show the reloaded task")
 	}
 }
@@ -147,7 +148,7 @@ func TestDetailBodyShowsEveryField(t *testing.T) {
 		Due:      testNow.Add(-24 * time.Hour),
 		Notes:    "line one\nline two",
 	}
-	body := m.detailBody(task)
+	body := ansi.Strip(m.detailBody(task))
 	for _, want := range []string{"resolved", "P0", "a · b", "due", "3d ago", "5h ago", "u-1", "line two"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("body lacks %q", want)
@@ -156,7 +157,7 @@ func TestDetailBodyShowsEveryField(t *testing.T) {
 	m.target = task
 	m.mode = modeDetail
 	m.refreshDetail()
-	if v := m.View(); !strings.Contains(v, " done thing") || strings.Contains(v, "#0") {
+	if v := screen(m); !strings.Contains(v, " done thing") || strings.Contains(v, "#0") {
 		t.Errorf("a resolved task has no id to show: %q", v[:40])
 	}
 }
@@ -228,7 +229,7 @@ func TestLongListScrolls(t *testing.T) {
 	}
 	m := start(t, &fake{open: many})
 	m = drive(t, m, key("G"))
-	if m.cursor != 39 || !strings.Contains(m.View(), "task 40") || strings.Contains(m.View(), "task 01") {
+	if m.cursor != 39 || !strings.Contains(screen(m), "task 40") || strings.Contains(screen(m), "task 01") {
 		t.Fatalf("G should scroll to the end: cursor=%d offset=%d", m.cursor, m.offset)
 	}
 	m = drive(t, m, key("ctrl+u"), key("g"))
@@ -247,7 +248,7 @@ func TestLongListScrolls(t *testing.T) {
 
 func TestQuitKeys(t *testing.T) {
 	m := start(t, &fake{open: tasks()})
-	for _, msg := range []tea.KeyMsg{key("q"), key("esc"), {Type: tea.KeyCtrlC}} {
+	for _, msg := range []tea.KeyPressMsg{key("q"), key("esc"), key("ctrl+c")} {
 		if _, cmd := m.Update(msg); cmd == nil || cmd() != tea.Quit() {
 			t.Errorf("%v should quit", msg)
 		}
@@ -257,18 +258,18 @@ func TestQuitKeys(t *testing.T) {
 func TestLoadErrorIsShown(t *testing.T) {
 	m := start(t, &fake{})
 	next, _ := m.Update(loadedMsg{err: errors.New("cannot read repo")})
-	if v := next.(Model).View(); !strings.Contains(v, "cannot read repo") {
+	if v := screen(next.(Model)); !strings.Contains(v, "cannot read repo") {
 		t.Errorf("load error not shown")
 	}
 }
 
 func TestLoadingAndEmptyMessages(t *testing.T) {
 	m := New(&fake{})
-	if !strings.Contains(m.View(), "loading") {
+	if !strings.Contains(screen(m), "loading") {
 		t.Errorf("a new model should say it is loading")
 	}
 	m = start(t, &fake{})
-	if !strings.Contains(m.View(), "no tasks") {
+	if !strings.Contains(screen(m), "no tasks") {
 		t.Errorf("an empty list should say so")
 	}
 }
@@ -325,18 +326,13 @@ func TestColorsArePaletteIndexes(t *testing.T) {
 		"project": styleProject, "tag": styleTag, "overdue": styleOverdue, "error": styleError,
 		"ok": styleOK, "key": styleKey,
 	}
-	for _, c := range tagPalette {
-		styles["tag "+string(c)] = lipgloss.NewStyle().Foreground(c)
+	for i, c := range tagPalette {
+		styles[fmt.Sprintf("tag %d", i)] = lipgloss.NewStyle().Foreground(c)
 	}
+	// Lip Gloss v2 gives an ansi.BasicColor for the indexes 0 to 15 only.
 	for name, st := range styles {
-		c, ok := st.GetForeground().(lipgloss.Color)
-		if !ok {
-			t.Errorf("%s: foreground is not a plain color", name)
-			continue
-		}
-		var n int
-		if _, err := fmt.Sscan(string(c), &n); err != nil || n < 0 || n > 15 {
-			t.Errorf("%s: color %q is not a palette index 0-15", name, c)
+		if _, ok := st.GetForeground().(ansi.BasicColor); !ok {
+			t.Errorf("%s: color %v is not a palette index 0-15", name, st.GetForeground())
 		}
 	}
 }
@@ -356,7 +352,7 @@ func TestRowsStayAlignedAcrossPriorities(t *testing.T) {
 			t.Errorf("%s: summary at column %d, want %d", p, at, col)
 		}
 	}
-	header := stripSGR(strings.Split(m.View(), "\n")[1])
+	header := stripSGR(strings.Split(screen(m), "\n")[1])
 	if at := lipgloss.Width(header[:strings.Index(header, "SUMMARY")]); at != col {
 		t.Errorf("header SUMMARY at column %d, rows at %d", at, col)
 	}
@@ -386,7 +382,7 @@ func TestIDColumnFitsTheLongestID(t *testing.T) {
 			continue
 		}
 		// The header and every row must still agree on the summary column.
-		header := stripSGR(strings.Split(m.View(), "\n")[1])
+		header := stripSGR(strings.Split(screen(m), "\n")[1])
 		row := stripSGR(m.row(open[len(open)-1], false))
 		hAt := lipgloss.Width(header[:strings.Index(header, "SUMMARY")])
 		rAt := lipgloss.Width(row[:strings.Index(row, "SUMMARY")])
@@ -427,7 +423,7 @@ func TestPagesTurnAndKeepThePlaceOnThePage(t *testing.T) {
 	if m.cursor != 17 || m.offset != 15 {
 		t.Fatalf("l: cursor=%d offset=%d, want 17 and 15", m.cursor, m.offset)
 	}
-	view := m.View()
+	view := screen(m)
 	if !strings.Contains(view, "task 16") || strings.Contains(view, "task 15") {
 		t.Errorf("page 2 should start at task 16")
 	}
@@ -481,7 +477,8 @@ func TestMovingPastThePageEdgeTurnsThePage(t *testing.T) {
 func TestDotsShowThePages(t *testing.T) {
 	m := start(t, &fake{open: manyTasks(40)})
 	m = drive(t, m, key("l"))
-	lines := strings.Split(m.View(), "\n")
+	// The raw view, with the color codes, because the test checks the style.
+	lines := strings.Split(m.render(), "\n")
 	dots := stripSGR(lines[len(lines)-2])
 	if strings.TrimSpace(dots) != "•••" {
 		t.Errorf("dots line = %q, want three dots", dots)
@@ -493,7 +490,7 @@ func TestDotsShowThePages(t *testing.T) {
 
 func TestOnePageHasNoDots(t *testing.T) {
 	m := start(t, &fake{open: tasks()})
-	if m.pages() != 1 || m.listRows() != 16 || strings.Contains(m.View(), "•") {
+	if m.pages() != 1 || m.listRows() != 16 || strings.Contains(screen(m), "•") {
 		t.Errorf("one page needs no dots and loses no row: rows=%d", m.listRows())
 	}
 	m = drive(t, m, key("l"), key("h"))
@@ -505,7 +502,7 @@ func TestOnePageHasNoDots(t *testing.T) {
 func TestManyPagesShowANumber(t *testing.T) {
 	m := start(t, &fake{open: manyTasks(400)})
 	m = drive(t, m, tea.WindowSizeMsg{Width: 20, Height: 10}, key("l"))
-	lines := strings.Split(m.View(), "\n")
+	lines := strings.Split(screen(m), "\n")
 	if got := strings.TrimSpace(stripSGR(lines[len(lines)-2])); got != fmt.Sprintf("2/%d", m.pages()) {
 		t.Errorf("pagination = %q, want 2/%d", got, m.pages())
 	}
@@ -538,7 +535,7 @@ func TestTagColumn(t *testing.T) {
 	open[1].Tags = nil
 	open[2].Tags = []string{"a-very-long-tag-name"}
 	m := start(t, &fake{open: open})
-	lines := strings.Split(m.View(), "\n")
+	lines := strings.Split(screen(m), "\n")
 	heading := lines[1]
 	col := strings.Index(heading, "SUMMARY")
 	if tags := strings.Index(heading, "TAGS"); tags < 0 || tags > col {
@@ -556,7 +553,7 @@ func TestTagColumn(t *testing.T) {
 	if !strings.Contains(lines[4], "a-very-long-t…") {
 		t.Errorf("a long tag is cut at the column width: %q", lines[4])
 	}
-	if strings.Contains(m.View(), "+backend") {
+	if strings.Contains(screen(m), "+backend") {
 		t.Errorf("the column needs no + before a tag")
 	}
 }
@@ -566,7 +563,7 @@ func TestTagColorIsStable(t *testing.T) {
 	if tagStyle("backend").GetForeground() != tagStyle("backend").GetForeground() {
 		t.Errorf("one tag must always get one color")
 	}
-	seen := map[lipgloss.TerminalColor]bool{}
+	seen := map[color.Color]bool{}
 	for _, tag := range []string{"backend", "docs", "home", "infra", "release", "review", "someday"} {
 		c := tagStyle(tag).GetForeground()
 		if c == lipgloss.Color("1") || c == lipgloss.Color("9") {

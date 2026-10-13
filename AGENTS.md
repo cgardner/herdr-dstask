@@ -45,6 +45,11 @@ works around each one, and a new store method must do the same:
 with `NewAt`. `internal/ui` tests use a fake `Backend`. For a manual test of
 the TUI, set `DSTASK_GIT_REPO` to a scratch repository.
 
+Lip Gloss v2 always writes the color codes; Bubble Tea downsamples them at
+output. A UI test that looks for text uses `screen(m)`, which strips them from
+`render()`. A test that checks a style reads `render()` itself. `View()` only
+wraps `render()` in a `tea.View` that asks for the alternate screen.
+
 ## End-to-end tests
 
 `e2e/` builds the binary once, runs it in a pseudo-terminal (`creack/pty`),

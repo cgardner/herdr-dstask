@@ -5,16 +5,16 @@ package ui
 import (
 	"errors"
 	"fmt"
+	"image/color"
 	"os/exec"
 	"slices"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/bubbles/textinput"
-	"github.com/charmbracelet/bubbles/viewport"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/textinput"
+	"charm.land/bubbles/v2/viewport"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/naggie/dstask"
 
@@ -132,7 +132,7 @@ type Model struct {
 	// the ID changes that a reload can bring.
 	marked map[string]bool
 
-	selectionBg lipgloss.Color
+	selectionBg color.Color
 
 	status    string
 	statusErr bool
@@ -202,8 +202,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
-		m.input.Width = max(10, msg.Width-6)
-		m.detail.Width, m.detail.Height = msg.Width, max(1, msg.Height-3)
+		m.input.SetWidth(max(10, msg.Width-6))
+		m.detail.SetWidth(msg.Width)
+		m.detail.SetHeight(max(1, msg.Height-3))
 		if m.mode == modeDetail || m.back == modeDetail {
 			m.refreshDetail()
 		}
@@ -242,7 +243,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.loading = true
 		return m, m.load()
 
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		// A status line reports the last action until the next key.
 		m.status, m.statusErr = "", false
 		switch m.mode {
@@ -410,7 +411,7 @@ func (m Model) selected() (dstask.Task, bool) {
 func (m *Model) setStatus(s string) { m.status, m.statusErr = s, false }
 func (m *Model) setErr(err error)   { m.status, m.statusErr = err.Error(), true }
 
-func (m Model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) updateList(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "q", "ctrl+c":
 		return m, tea.Quit
@@ -498,7 +499,7 @@ func (m Model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "p":
 		return m.openProjects()
-	case " ":
+	case "space":
 		return m.toggleMark()
 	case "*":
 		return m.toggleMarkAll()
@@ -509,7 +510,7 @@ func (m Model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) updateDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) updateDetail(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "q", "esc", "h", "left", "backspace":
 		m.mode = modeList
@@ -544,7 +545,7 @@ func (m Model) updateDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // taskKey handles the keys that change the selected task. They behave the
 // same in the list and in the detail view.
-func (m Model) taskKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) taskKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	t, ok := m.selected()
 	if m.mode == modeDetail {
 		t, ok = m.target, true
@@ -639,7 +640,7 @@ var placeholders = map[promptKind]string{
 	promptProjectFilter: "words in the project name",
 }
 
-func (m Model) updatePrompt(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) updatePrompt(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc", "ctrl+c":
 		m.mode = m.back
@@ -683,7 +684,7 @@ func (m Model) updatePrompt(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m Model) updateConfirm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) updateConfirm(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	m.mode = m.back
 	if msg.String() != "y" {
 		m.setStatus("kept " + m.targetLabel)

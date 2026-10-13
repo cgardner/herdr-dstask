@@ -8,9 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/muesli/termenv"
 )
 
 var sgr = regexp.MustCompile(`\x1b\[([0-9;]*)m`)
@@ -41,9 +40,6 @@ func bgCoverage(line string) []bool {
 }
 
 func TestSelectedRowIsHighlightedAcrossTheWidth(t *testing.T) {
-	lipgloss.SetColorProfile(termenv.TrueColor)
-	t.Cleanup(func() { lipgloss.SetColorProfile(termenv.Ascii) })
-
 	m := start(t, &fake{open: tasks()})
 	m.selectionBg = lipgloss.Color(defaultSelectionBg)
 	m.now = func() time.Time { return time.Date(2026, 9, 25, 0, 0, 0, 0, time.UTC) }
@@ -73,15 +69,15 @@ func TestSelectionBackgroundPrecedence(t *testing.T) {
 	t.Setenv("HERDR_CONFIG_PATH", cfg)
 
 	t.Setenv(selectionBgEnv, "#112233")
-	if got := selectionBackground(); got != "#112233" {
-		t.Errorf("env should win, got %s", got)
+	if got := selectionBackground(); got != lipgloss.Color("#112233") {
+		t.Errorf("env should win, got %v", got)
 	}
 	t.Setenv(selectionBgEnv, "not a color")
-	if got := selectionBackground(); got != "#445566" {
-		t.Errorf("config should win over the default, got %s", got)
+	if got := selectionBackground(); got != lipgloss.Color("#445566") {
+		t.Errorf("config should win over the default, got %v", got)
 	}
 	t.Setenv("HERDR_CONFIG_PATH", filepath.Join(t.TempDir(), "missing.toml"))
-	if got := selectionBackground(); got != defaultSelectionBg {
-		t.Errorf("default expected, got %s", got)
+	if got := selectionBackground(); got != lipgloss.Color(defaultSelectionBg) {
+		t.Errorf("default expected, got %v", got)
 	}
 }

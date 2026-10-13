@@ -7,7 +7,7 @@ import (
 	"io"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/cgardner/herdr-dstask/internal/state"
 	"github.com/cgardner/herdr-dstask/internal/store"
@@ -39,7 +39,7 @@ var (
 	// runProgram is the one call that needs a real terminal. It returns the
 	// model as the user left it, so the view can be saved.
 	runProgram = func(m ui.Model) (ui.Model, error) {
-		final, err := tea.NewProgram(m, tea.WithAltScreen()).Run()
+		final, err := tea.NewProgram(m).Run()
 		fm, _ := final.(ui.Model)
 		return fm, err
 	}

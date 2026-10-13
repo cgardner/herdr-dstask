@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/naggie/dstask"
 
 	"github.com/cgardner/herdr-dstask/internal/store"
@@ -57,7 +57,7 @@ func TestProjectsOpenSortedByUrgency(t *testing.T) {
 	if got := names(m.projects); got != "lighthouse,harbor,atlas" {
 		t.Errorf("order = %s", got)
 	}
-	view := m.View()
+	view := screen(m)
 	for _, want := range []string{"projects 3", "2 finished hidden", "LAST DONE", "40%", "4/10", "6 open", "▶ 1", "‖ 1", "1 late", "3d ago"} {
 		if !strings.Contains(view, want) {
 			t.Errorf("view lacks %q", want)
@@ -72,7 +72,7 @@ func TestTabShowsFinishedProjectsLast(t *testing.T) {
 	if got := names(m.projects); got != "lighthouse,harbor,atlas,launch,archive" {
 		t.Errorf("order = %s", got)
 	}
-	view := m.View()
+	view := screen(m)
 	if !strings.Contains(view, "✓ finished") || !strings.Contains(view, "Jun 2026") || strings.Contains(view, "hidden") {
 		t.Errorf("finished projects not shown right:\n%s", view)
 	}
@@ -143,7 +143,7 @@ func TestProjectViewKeys(t *testing.T) {
 	}
 	m := startProjects(t, &fake{open: tasks(), projects: many})
 	rows := m.projectRows()
-	if m.projectPages() != 2 || !strings.Contains(m.View(), "••") {
+	if m.projectPages() != 2 || !strings.Contains(screen(m), "••") {
 		t.Fatalf("pages=%d", m.projectPages())
 	}
 	m = drive(t, m, key("j"), key("l"))
@@ -159,7 +159,7 @@ func TestProjectViewKeys(t *testing.T) {
 		t.Errorf("cursor=%d, want 0", m.pcursor)
 	}
 	m = drive(t, m, key("?"))
-	if m.mode != modeHelp || !strings.Contains(m.View(), "show or hide finished projects") {
+	if m.mode != modeHelp || !strings.Contains(screen(m), "show or hide finished projects") {
 		t.Fatalf("help from the project view")
 	}
 	m = drive(t, m, key("z"), key("r"))
@@ -176,15 +176,15 @@ func TestProjectViewKeys(t *testing.T) {
 
 func TestProjectsErrorAndEmpty(t *testing.T) {
 	m := startProjects(t, &fake{open: tasks(), projectsErr: errors.New("cannot read resolved")})
-	if !strings.Contains(m.View(), "cannot read resolved") {
+	if !strings.Contains(screen(m), "cannot read resolved") {
 		t.Errorf("load error not shown")
 	}
 	m = startProjects(t, &fake{open: tasks()})
-	if !strings.Contains(m.View(), "no projects: give a task one") {
+	if !strings.Contains(screen(m), "no projects: give a task one") {
 		t.Errorf("empty message missing")
 	}
 	m = startProjects(t, &fake{open: tasks(), projects: []store.Project{project("done", "P2", 1, 1)}})
-	if !strings.Contains(m.View(), "no projects with open tasks") {
+	if !strings.Contains(screen(m), "no projects with open tasks") {
 		t.Errorf("all-finished message missing")
 	}
 	if drive(t, m, key("enter")).mode != modeProjects {
@@ -216,7 +216,7 @@ func TestProgressBarRounding(t *testing.T) {
 func TestProjectColumnsAlign(t *testing.T) {
 	m := startProjects(t, &fake{open: tasks(), projects: sampleProjects()})
 	m = drive(t, m, key("tab"))
-	lines := strings.Split(m.View(), "\n")
+	lines := strings.Split(screen(m), "\n")
 	header := stripSGR(lines[1])
 	at := lipgloss.Width(header[:strings.Index(header, "LAST DONE")])
 	for _, line := range lines[2:7] {
@@ -282,7 +282,7 @@ func TestProjectSortOrders(t *testing.T) {
 		if got := names(m.projects); got != c.order {
 			t.Errorf("%s: order = %s, want %s", c.sort, got, c.order)
 		}
-		view := m.View()
+		view := screen(m)
 		if !strings.Contains(view, "sort ") || !strings.Contains(view, c.sort) {
 			t.Errorf("%s: header does not name the order", c.sort)
 		}
@@ -339,7 +339,7 @@ func filterProjects() []store.Project {
 func TestProjectFilterNarrowsAsYouType(t *testing.T) {
 	m := startProjects(t, &fake{open: tasks(), projects: filterProjects()})
 	m = drive(t, m, key("/"))
-	if m.mode != modePrompt || m.prompt != promptProjectFilter || !strings.Contains(m.View(), "filter projects") {
+	if m.mode != modePrompt || m.prompt != promptProjectFilter || !strings.Contains(screen(m), "filter projects") {
 		t.Fatalf("/ should open the project filter, mode=%v", m.mode)
 	}
 	m = drive(t, m, typed("ai")...)
@@ -347,14 +347,14 @@ func TestProjectFilterNarrowsAsYouType(t *testing.T) {
 		t.Errorf("ai: %s", got)
 	}
 	// The view stays behind the prompt while the user types.
-	if !strings.Contains(m.View(), "projects 3 of 4") {
-		t.Errorf("header should count the matches:\n%s", m.View())
+	if !strings.Contains(screen(m), "projects 3 of 4") {
+		t.Errorf("header should count the matches:\n%s", screen(m))
 	}
 	m = drive(t, m, append(typed(" gov"), key("enter"))...)
 	if m.mode != modeProjects || m.pfilter != "ai gov" || names(m.projects) != "ai-governance" {
 		t.Fatalf("mode=%v filter=%q projects=%s", m.mode, m.pfilter, names(m.projects))
 	}
-	header := strings.Split(m.View(), "\n")[0]
+	header := strings.Split(screen(m), "\n")[0]
 	if !strings.Contains(header, "ai") || !strings.Contains(header, "gov") || !strings.Contains(header, "⌫") {
 		t.Errorf("header should show each word of the filter and the key: %q", header)
 	}
@@ -367,7 +367,7 @@ func TestProjectFilterIgnoresCaseAndCountsHiddenFinished(t *testing.T) {
 	if len(m.projects) != 0 {
 		t.Fatalf("a finished project is hidden: %s", names(m.projects))
 	}
-	view := m.View()
+	view := screen(m)
 	if !strings.Contains(view, `no project matches "ARCHIVE" among the open ones`) || !strings.Contains(view, "1 finished hidden") {
 		t.Errorf("empty message or hidden count wrong:\n%s", view)
 	}
@@ -377,8 +377,8 @@ func TestProjectFilterIgnoresCaseAndCountsHiddenFinished(t *testing.T) {
 	}
 	m = drive(t, m, key("/"))
 	m = drive(t, m, append(typed("x"), key("enter"))...)
-	if !strings.Contains(m.View(), `no project matches "ARCHIVEx"`) || strings.Contains(m.View(), "among the open ones") {
-		t.Errorf("with finished shown, the hint must not mention tab:\n%s", m.View())
+	if !strings.Contains(screen(m), `no project matches "ARCHIVEx"`) || strings.Contains(screen(m), "among the open ones") {
+		t.Errorf("with finished shown, the hint must not mention tab:\n%s", screen(m))
 	}
 }
 

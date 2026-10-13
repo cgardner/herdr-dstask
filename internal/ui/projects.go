@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/bubbles/paginator"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/paginator"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/cgardner/herdr-dstask/internal/store"
@@ -188,7 +188,7 @@ func (m *Model) clampProjects() {
 	m.poffset = (m.pcursor / rows) * rows
 }
 
-func (m Model) updateProjects(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) updateProjects(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	rows := m.projectRows()
 	switch msg.String() {
 	case "q", "ctrl+c":

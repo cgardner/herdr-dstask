@@ -4,11 +4,11 @@ import (
 	"strings"
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/naggie/dstask"
 )
 
-func space() tea.KeyMsg { return tea.KeyMsg{Type: tea.KeySpace, Runes: []rune{' '}} }
+func space() tea.KeyPressMsg { return tea.KeyPressMsg{Code: tea.KeySpace, Text: " "} }
 
 func TestSpaceMarksAndMovesDown(t *testing.T) {
 	m := start(t, &fake{open: tasks()})
@@ -19,7 +19,7 @@ func TestSpaceMarksAndMovesDown(t *testing.T) {
 	if m.cursor != 2 {
 		t.Errorf("cursor = %d, want 2 after two marks", m.cursor)
 	}
-	view := m.View()
+	view := screen(m)
 	if !strings.Contains(view, "2 marked") || strings.Count(view, "✓") != 2 {
 		t.Errorf("view should show two marks:\n%s", view)
 	}
@@ -43,7 +43,7 @@ func TestBulkChangesActOnEveryMarkedTask(t *testing.T) {
 	if len(f.calls) != 1 || f.calls[0] != "done 3,9" {
 		t.Errorf("calls = %v", f.calls)
 	}
-	if len(m.marked) != 0 || !strings.Contains(m.View(), "resolved 2 tasks") {
+	if len(m.marked) != 0 || !strings.Contains(screen(m), "resolved 2 tasks") {
 		t.Errorf("a successful bulk change should clear the marks and report: %v", m.marked)
 	}
 }
@@ -53,8 +53,8 @@ func TestBulkModifyAndNoteUseOnePrompt(t *testing.T) {
 	m := start(t, f)
 	m = drive(t, m, key("*"))
 	m = drive(t, m, key("m"))
-	if !strings.Contains(m.View(), "modify 3 tasks") {
-		t.Errorf("the prompt should name the count:\n%s", m.View())
+	if !strings.Contains(screen(m), "modify 3 tasks") {
+		t.Errorf("the prompt should name the count:\n%s", screen(m))
 	}
 	m = drive(t, m, append(typed("+sprint"), key("enter"))...)
 	m = drive(t, m, key("*"), key("n"))
@@ -80,11 +80,11 @@ func TestBulkRemoveAsksWithTheCount(t *testing.T) {
 	f := &fake{open: tasks()}
 	m := start(t, f)
 	m = drive(t, m, space(), space(), key("x"))
-	if !strings.Contains(m.View(), "remove 2 tasks?") {
-		t.Fatalf("confirm should name the count:\n%s", m.View())
+	if !strings.Contains(screen(m), "remove 2 tasks?") {
+		t.Fatalf("confirm should name the count:\n%s", screen(m))
 	}
 	m = drive(t, m, key("n"))
-	if len(f.calls) != 0 || len(m.marked) != 2 || !strings.Contains(m.View(), "kept 2 tasks") {
+	if len(f.calls) != 0 || len(m.marked) != 2 || !strings.Contains(screen(m), "kept 2 tasks") {
 		t.Errorf("no should keep the tasks and the marks: calls=%v marked=%d", f.calls, len(m.marked))
 	}
 	drive(t, m, key("x"), key("y"))
@@ -98,7 +98,7 @@ func TestOneMarkedTaskIsNamedByID(t *testing.T) {
 	m := start(t, f)
 	m = drive(t, m, key("j"), key("j"), space(), key("g"), key("x"))
 	// The cursor is on #3, but the mark is on #9, and the mark wins.
-	if !strings.Contains(m.View(), "remove #9?") {
+	if !strings.Contains(screen(m), "remove #9?") {
 		t.Errorf("confirm = %q", m.footer())
 	}
 }
@@ -129,8 +129,8 @@ func TestStarTogglesTheVisibleTasksOnly(t *testing.T) {
 	if !m.marked["a"] || !m.marked["b"] || len(m.marked) != 2 {
 		t.Fatalf("* should mark the visible #7 and keep #3: %v", m.marked)
 	}
-	if !strings.Contains(m.View(), "2 marked (1 hidden by the filter)") {
-		t.Errorf("header should warn about the hidden mark:\n%s", m.View())
+	if !strings.Contains(screen(m), "2 marked (1 hidden by the filter)") {
+		t.Errorf("header should warn about the hidden mark:\n%s", screen(m))
 	}
 	m = drive(t, m, key("*"))
 	if !m.marked["a"] || m.marked["b"] {
@@ -156,7 +156,7 @@ func TestResolvedTasksCannotBeMarked(t *testing.T) {
 	if len(m.marked) != 0 {
 		t.Errorf("tab should clear the marks")
 	}
-	for _, k := range []tea.KeyMsg{space(), key("*")} {
+	for _, k := range []tea.KeyPressMsg{space(), key("*")} {
 		if mm := drive(t, m, k); len(mm.marked) != 0 || !mm.statusErr {
 			t.Errorf("%v in the resolved list should refuse", k)
 		}
