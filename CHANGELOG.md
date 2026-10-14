@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.4.0](https://github.com/cgardner/herdr-dstask/compare/v0.3.0...v0.4.0) (2026-10-14)
+
+
+### Features
+
+* drop the last filter with backspace ([78f0e64](https://github.com/cgardner/herdr-dstask/commit/78f0e646620f341ea4db981d4d5a0f92583ef19c))
+* drop the last name filter word with backspace in the project view ([f4abf5c](https://github.com/cgardner/herdr-dstask/commit/f4abf5c571edbd2a9b5b2c79e2040fe46f532c44))
+* mark tasks with space and change them all at once ([bc35707](https://github.com/cgardner/herdr-dstask/commit/bc35707229b7a32ee7eb4a5ef621449e305a40b3))
+* reopen the popup on the last view, saved per repository ([a689d13](https://github.com/cgardner/herdr-dstask/commit/a689d138f285006069d4e4eb84cfc2e157cacff9))
+* show every task when the filters match none ([55e0078](https://github.com/cgardner/herdr-dstask/commit/55e0078473a97ce402fa3d533cbb5de2c63468a5))
+* show tags in a column with a color for each tag ([942490e](https://github.com/cgardner/herdr-dstask/commit/942490e9aa10c84ff567b85f3061730eebf59e70))
+
+
+### Bug Fixes
+
+* **demo:** build the binary on every run of the demo script ([07ba30a](https://github.com/cgardner/herdr-dstask/commit/07ba30acd0b71b3969c7e3c61fb020666ab66085))
+
 ## [0.3.0](https://github.com/cgardner/herdr-dstask/compare/v0.2.0...v0.3.0) (2026-10-05)
 
 
