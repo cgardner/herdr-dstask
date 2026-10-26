@@ -162,7 +162,8 @@ In the list:
 
 In the filter, `project:atlas` matches the tasks of that project, and
 `project:` alone matches the tasks without one. `#72` matches task 72, and
-`#72 #29` matches either task.
+`#72 #29` matches either task. `uuid:3f2a` matches the tasks whose UUID starts
+with `3f2a`, and a whole UUID pasted alone matches that task.
 Other words then narrow the result. A number without `#` is a text search, so
 a ticket number such as `3995` in a summary can still be found. `A` and `/`
 work together. The header shows each filter in angle brackets. `backspace`

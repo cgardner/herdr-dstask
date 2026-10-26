@@ -323,13 +323,23 @@ func (m *Model) applyFilter() {
 // stays a text search, so a ticket number such as "3995" in a summary can
 // still be found. A lone "#" matches everything, so the list does not empty
 // while the user starts to type an ID.
+//
+// A word such as "uuid:3f2a9c" matches a task whose UUID starts with that
+// text, and a full UUID alone matches that task exactly. Both ignore case and
+// dashes. Several UUID words match any of those tasks, as ID words do. A bare
+// hex word stays a text search, so "dead" in a summary can still be found.
 func matches(t dstask.Task, filter string) bool {
 	hay := strings.ToLower(strings.Join([]string{
 		t.Summary, t.Project, strings.Join(t.Tags, " "), t.Notes, t.Priority, t.Status,
 	}, "\n"))
 	var ids []int
+	var uuids []string
 	for _, word := range strings.Fields(strings.ToLower(filter)) {
 		if word == "#" {
+			continue
+		}
+		if prefix, ok := uuidWord(word); ok {
+			uuids = append(uuids, prefix)
 			continue
 		}
 		if id, ok := idWord(word); ok {
@@ -346,7 +356,36 @@ func matches(t dstask.Task, filter string) bool {
 			return false
 		}
 	}
-	return len(ids) == 0 || slices.Contains(ids, t.ID)
+	if len(ids) > 0 && !slices.Contains(ids, t.ID) {
+		return false
+	}
+	if len(uuids) == 0 {
+		return true
+	}
+	id := strings.ReplaceAll(strings.ToLower(t.UUID), "-", "")
+	return slices.ContainsFunc(uuids, func(prefix string) bool {
+		return strings.HasPrefix(id, prefix)
+	})
+}
+
+// uuidWord reads "uuid:3f2a-9c" as the prefix "3f2a9c", and a whole UUID as
+// its 32 digits. A bare "uuid:" matches every task, so the list does not
+// empty while the user starts to type.
+func uuidWord(word string) (string, bool) {
+	rest, ok := strings.CutPrefix(word, "uuid:")
+	if !ok {
+		rest = word
+		if len(rest) != 36 || rest[8] != '-' || rest[13] != '-' || rest[18] != '-' || rest[23] != '-' {
+			return "", false
+		}
+	}
+	rest = strings.ReplaceAll(rest, "-", "")
+	for _, r := range rest {
+		if !strings.ContainsRune("0123456789abcdef", r) {
+			return "", false
+		}
+	}
+	return rest, true
 }
 
 // idWord reads "#72" as the ID 72.
