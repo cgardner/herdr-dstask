@@ -472,3 +472,38 @@ func TestNoMatchShowsAllTasksWithNotice(t *testing.T) {
 		t.Errorf("clearing the filter must clear the notice")
 	}
 }
+
+func TestFilterByUUID(t *testing.T) {
+	open := []dstask.Task{
+		{UUID: "3f2a9c10-aaaa-4bbb-8ccc-000000000001", ID: 1, Summary: "one", Status: "pending", Priority: "P2"},
+		{UUID: "3f2b0000-aaaa-4bbb-8ccc-000000000002", ID: 2, Summary: "two dead", Status: "pending", Priority: "P2"},
+		{UUID: "9d0e5a77-aaaa-4bbb-8ccc-000000000003", ID: 3, Summary: "three", Status: "pending", Priority: "P2"},
+	}
+	cases := []struct {
+		filter string
+		want   []int
+	}{
+		{"uuid:3f2a", []int{1}},                            // a prefix
+		{"uuid:3F2A9C10-AA", []int{1}},                     // case and dashes do not matter
+		{"uuid:3f2 uuid:9d0", []int{1, 2, 3}},              // several words match any
+		{"uuid:3f2 two", []int{2}},                         // text words narrow the result
+		{"3f2a9c10-aaaa-4bbb-8ccc-000000000001", []int{1}}, // a whole UUID alone
+		{"3f2a9c10-aaaa-4bbb-8ccc-00000000000", nil},       // short, so a text search
+		{"uuid:", []int{1, 2, 3}},                          // a bare prefix hides nothing
+		{"uuid:zz", nil},                                   // not hex, so a text word
+		{"uuid:ffff", nil},                                 // no such task
+		{"dead", []int{2}},                                 // bare hex stays a text search
+		{"#3 uuid:3f2", nil},                               // ID and UUID words both apply
+	}
+	for _, c := range cases {
+		var got []int
+		for _, task := range open {
+			if matches(task, c.filter) {
+				got = append(got, task.ID)
+			}
+		}
+		if fmt.Sprint(got) != fmt.Sprint(c.want) {
+			t.Errorf("%q: got %v, want %v", c.filter, got, c.want)
+		}
+	}
+}
